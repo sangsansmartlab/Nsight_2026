@@ -1,0 +1,6 @@
+{
+  "name": "NSight",
+  "description": "상산고등학교 SMARTLAB의 다차원 실시간 뉴스 분석 및 3D 공간 시각화 플랫폼",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
