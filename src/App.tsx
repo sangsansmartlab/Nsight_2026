@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { VectorMap3D } from './components/VectorMap3D';
+import { LandingView } from './components/LandingView';
+import { AuthModal, AuthUser } from './components/AuthModal';
 import { DEMO_DATASETS, DatasetItem } from './data/mockDatasets';
 import { Article, CustomAxes } from './types';
 import {
@@ -25,7 +27,9 @@ import {
   Palette,
   ChevronUp,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Home,
+  LogIn
 } from 'lucide-react';
 import { getContinuousColor, isPoliticsDomain } from './utils/colorScale';
 
@@ -136,6 +140,37 @@ export const detectDomainPreset = (query: string): DomainPresetInfo => {
 };
 
 export const App: React.FC = () => {
+  // App view mode: 'LANDING' (first screen with prominent search & settings) vs 'EXPLORER' (3D map)
+  const [appMode, setAppMode] = useState<'LANDING' | 'EXPLORER'>('LANDING');
+
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('nsight_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  const handleLogin = (user: AuthUser) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('nsight_user', JSON.stringify(user));
+    } catch {}
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('nsight_user');
+    } catch {}
+  };
+
   const [currentQuery, setCurrentQuery] = useState<string>('AI 기본법');
   const [dataset, setDataset] = useState<DatasetItem>(DEMO_DATASETS['AI 기본법']);
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -261,10 +296,14 @@ export const App: React.FC = () => {
   };
 
   // Perform real-time Search & 4D Vectorization
-  const handlePerformSearch = async (e?: React.FormEvent) => {
+  const handlePerformSearch = async (e?: React.FormEvent, queryOverride?: string) => {
     if (e) e.preventDefault();
-    const query = searchFilter.trim();
+    const query = (queryOverride || searchFilter).trim();
     if (!query) return;
+
+    if (queryOverride) {
+      setSearchFilter(queryOverride);
+    }
 
     setIsSearching(true);
     setIsCustomSettingsOpen(false);
@@ -305,6 +344,7 @@ export const App: React.FC = () => {
         setCameraPresetCommand('RESET');
         setActivePreset('RESET');
         setSearchFeedbackToast(null);
+        setAppMode('EXPLORER');
       } else {
         setSearchFeedbackToast(
           data.message || `‘${query}’ 관련 실제 언론사 보도 기사를 찾지 못했습니다. 보다 대중적인 키워드로 검색해 보세요.`
@@ -338,6 +378,39 @@ export const App: React.FC = () => {
   // Check whether 4D Color axis is actively used in the current dataset
   const isColorAxisActive = Boolean(dataset.axes.color_axis && dataset.axes.color_axis.trim());
 
+  // Render Landing View when on first visit before searching
+  if (appMode === 'LANDING') {
+    return (
+      <>
+        <LandingView
+          searchFilter={searchFilter}
+          setSearchFilter={setSearchFilter}
+          onSearch={handlePerformSearch}
+          isSearching={isSearching}
+          searchCount={searchCount}
+          setSearchCount={setSearchCount}
+          customAxes={customAxes}
+          setCustomAxes={setCustomAxes}
+          enableColorAxis={enableColorAxis}
+          setEnableColorAxis={setEnableColorAxis}
+          isAutoAxesEnabled={isAutoAxesEnabled}
+          setIsAutoAxesEnabled={setIsAutoAxesEnabled}
+          currentUser={currentUser}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          searchFeedbackToast={searchFeedbackToast}
+          onClearFeedbackToast={() => setSearchFeedbackToast(null)}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          currentUser={currentUser}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 select-none font-sans">
       {/* 3D WebGL Canvas Layer */}
@@ -368,22 +441,32 @@ export const App: React.FC = () => {
         <header className="pointer-events-auto clean-panel p-2.5 sm:p-3.5 rounded-xl border border-white/10 shadow-2xl space-y-2">
           {/* Row 1: Brand & Search Bar & Mobile Controls */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            {/* Logo & Branding */}
+            {/* Logo & Branding with Home Navigation */}
             <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 flex items-center justify-center font-black text-base sm:text-lg text-white shadow-lg shadow-blue-500/25">
-                N
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white">NSight 3D</h1>
-                  <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-400 font-semibold hidden xs:inline">
-                    SMARTLAB
-                  </span>
+              <button
+                type="button"
+                onClick={() => setAppMode('LANDING')}
+                className="flex items-center gap-2 sm:gap-2.5 text-left group cursor-pointer"
+                title="첫 검색 랜딩 화면으로 이동 (홈)"
+              >
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 flex items-center justify-center font-black text-base sm:text-lg text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
+                  N
                 </div>
-                <p className="text-[10px] sm:text-[11px] text-slate-400 hidden md:block">
-                  상산고등학교 SMARTLAB · 실시간 다차원 뉴스 벡터화 & 3D 시각화
-                </p>
-              </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white group-hover:text-blue-300 transition-colors">
+                      NSight 3D
+                    </h1>
+                    <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-400 font-semibold hidden xs:inline">
+                      SMARTLAB
+                    </span>
+                  </div>
+                  <p className="text-[10px] sm:text-[11px] text-blue-400 font-medium flex items-center gap-1">
+                    <Home className="w-3 h-3" />
+                    <span>홈으로 가기</span>
+                  </p>
+                </div>
+              </button>
             </div>
 
             {/* Clean Responsive Search Bar */}
@@ -508,25 +591,31 @@ export const App: React.FC = () => {
               </button>
             </div>
 
-            {/* Topic / Dataset Switcher Strip */}
-            <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 shrink-0">
-              <span className="text-slate-400 px-1 text-[10px] font-medium flex items-center gap-1">
-                <Layers className="w-3 h-3 text-indigo-400" />
-                프리셋:
-              </span>
-              {Object.keys(DEMO_DATASETS).map((key) => (
+            {/* User Account / Profile Button in Explorer Top Bar */}
+            <div className="flex items-center gap-2 shrink-0">
+              {currentUser ? (
                 <button
-                  key={key}
-                  onClick={() => handleSelectDataset(key)}
-                  className={`px-2.5 py-0.5 text-[11px] font-medium rounded whitespace-nowrap transition-all ${
-                    currentQuery === key
-                      ? 'bg-slate-700 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`}
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-blue-500/50 text-[11px] font-semibold transition-all shadow-sm"
+                  title="내 계정 정보"
                 >
-                  {key}
+                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-[9px] font-bold text-white">
+                    {currentUser.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <span className="truncate max-w-[80px]">{currentUser.name}</span>
                 </button>
-              ))}
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold transition-all shadow-sm"
+                  title="로그인 / 회원가입"
+                >
+                  <LogIn className="w-3 h-3" />
+                  <span>로그인</span>
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -1532,6 +1621,14 @@ export const App: React.FC = () => {
           </footer>
         )}
 
+        {/* Auth Modal for Explorer View */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          currentUser={currentUser}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+        />
       </div>
     </div>
   );
