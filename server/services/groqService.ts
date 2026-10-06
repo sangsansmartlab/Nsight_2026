@@ -82,16 +82,21 @@ export class GroqAnalysisService {
 
         const prompt = `
 당신은 상산고등학교 SMARTLAB의 다차원 뉴스 인텔리전스 분석 AI입니다.
-아래 제공된 뉴스 기사를 분석하고, 사용자가 지정한 4차원 축에 따라 정밀하게 벡터 좌표화(X, Y, Z, Color) 및 요약을 수행하세요.
+아래 제공된 실제 뉴스 기사를 분석하고, 사용자가 지정한 축에 따라 정밀하게 벡터 좌표화(X, Y, Z, Color) 및 요약을 수행하세요.
 
 [분석 축 기준]
 - X축 (가로 쟁점 대립각): "${axes.x_axis}" (값 범위: -1.0 ~ +1.0)
 - Y축 (파급력 및 사회적 영향도): "${axes.y_axis}" (값 범위: -1.0 ~ +1.0)
 - Z축 (정보 신뢰도 및 근거 객관성): "${axes.z_axis}" (값 범위: -1.0 ~ +1.0)
-- Color축 (기사 성향): "${axes.color_axis}"
-※ 색상 규칙 지침:
-- 정치 관련 축일 경우: 보수 성향은 "#EF4444"(빨강), 진보 성향은 "#3B82F6"(파랑), 중립/균형은 "#F8FAFC"(흰색)으로 color_hex를 지정하세요.
-- 기업/경제 관련 축일 경우: 호재는 "#10B981"(에메랄드), 악재/리스크는 "#EF4444"(레드), 중립/전망은 "#3B82F6"(블루)으로 지정하세요.
+- Color축 (4차원 성향 지표): "${axes.color_axis || '비활성 (색상 축 없음)'}"
+
+[엄격한 사실 기반 및 환각(할루시네이션) 방지 지침]
+- 반드시 제공된 [분석 대상 기사]의 실제 제목, 언론사, 본문/요약 내용에 명시된 객관적 사실에만 근거하여 요약 및 좌표를 산출하세요.
+- 비유명 키워드나 틈새 분야 기사일 경우 기사에 없는 가상의 사실이나 배경을 임의로 지어내지(할루시네이션) 마세요.
+- Color축 규칙:
+  * 4차원 Color축이 명시되지 않았거나 비활성화된 경우: color_hex는 "#38BDF8", color_label은 "3차원 공간 (색상축 비활성)"으로 지정하세요.
+  * 정치 관련 축: 보수 성향은 빨강 계열 (수치에 따라 #DC2626 ~ #991B1B), 진보 성향은 파랑 계열 (수치에 따라 #2563EB ~ #1E3A8A), 중립/중도는 흰색 "#FFFFFF"
+  * 기업/경제/기술 축: 호재/진흥은 에메랄드 (#34D399 ~ #059669), 악재/우려는 레드 (#F87171 ~ #DC2626), 중립은 흰색 "#FFFFFF"
 
 [분석 대상 기사]
 - 제목: ${article.title}
@@ -103,19 +108,19 @@ export class GroqAnalysisService {
 반드시 아래 JSON 스키마 형식에 맞춰 정확한 JSON 문자열 하나만 출력하세요.
 {
   "summary_3lines": [
-    "1행 요약 문장",
-    "2행 요약 문장",
-    "3행 요약 문장"
+    "기사 본문/요약에 기반한 1행 사실 요약",
+    "기사 본문/요약에 기반한 2행 사실 요약",
+    "기사 본문/요약에 기반한 3행 사실 요약"
   ],
-  "keywords": ["핵심키워드1", "핵심키워드2", "핵심키워드3", "핵심키워드4"],
+  "keywords": ["기사에_등장하는_핵심키워드1", "핵심키워드2", "핵심키워드3", "핵심키워드4"],
   "coordinates": {
     "x": 0.15, // float between -1.0 and 1.0
     "y": 0.85, // float between -1.0 and 1.0
     "z": 0.70, // float between -1.0 and 1.0
-    "color_hex": "#3B82F6", // 16진수 색상 코드 (예: #10B981(진흥), #EF4444(비판/규제), #3B82F6(중립), #8B5CF6(윤리), #F59E0B(주의))
-    "color_label": "성향 레이블 (예: 중립/건설적, 규제우려, 산업진흥 등)"
+    "color_hex": "#38BDF8", // 16진수 색상 코드
+    "color_label": "성향 레이블"
   },
-  "ai_rationale": "해당 기사를 X, Y, Z 좌표로 산출한 객관적 근거 1~2문장 설명"
+  "ai_rationale": "기사 실제 보도 내용에 근거한 좌표 산출 근거 1~2문장"
 }
 `;
 
@@ -308,18 +313,64 @@ export class GroqAnalysisService {
       }
     }
 
+    // Ground 3-line summary directly in authentic crawled snippet/title
+    const rawSnippet = (article.snippet || '').trim();
+    const rawTitle = article.title.trim();
+
+    const snippetSentences = rawSnippet
+      ? rawSnippet
+          .split(/(?<=[.!?])\s+|\n+/)
+          .map((s) => s.replace(/<[^>]+>/g, '').trim())
+          .filter((s) => s.length >= 10)
+      : [];
+
+    let summary_3lines: string[] = [];
+    if (snippetSentences.length >= 3) {
+      summary_3lines = snippetSentences.slice(0, 3);
+    } else if (snippetSentences.length === 2) {
+      summary_3lines = [
+        rawTitle,
+        snippetSentences[0],
+        snippetSentences[1]
+      ];
+    } else if (snippetSentences.length === 1) {
+      summary_3lines = [
+        rawTitle,
+        snippetSentences[0],
+        `출처: ${article.publisher} (${article.pub_date})`
+      ];
+    } else {
+      summary_3lines = [
+        rawTitle,
+        `보도: ${article.publisher} 언론사 기사`,
+        `[${axes.x_axis}] 축 기반 정밀 벡터 분석 완료`
+      ];
+    }
+
+    // Extract actual factual keywords from title and snippet
+    const words = `${rawTitle} ${rawSnippet}`
+      .replace(/[^\w\s가-힣]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 2 && !['기자', '보도', '뉴스', '배포', '무단', '전재', '재배포', '금지', '지난', '있는', '대한', '통해'].includes(w));
+    const wordFreq: Record<string, number> = {};
+    words.forEach((w) => {
+      wordFreq[w] = (wordFreq[w] || 0) + 1;
+    });
+    const topKeywords = Object.entries(wordFreq)
+      .sort((a, b) => b[1] - a[1])
+      .map(([w]) => w)
+      .slice(0, 4);
+
+    const keywords = topKeywords.length >= 2 ? topKeywords : [article.publisher, '실시간 보도', '주요 이슈'];
+
     return {
       id: article.id,
       title: article.title,
       publisher: article.publisher,
       origin_link: article.origin_link,
       pub_date: article.pub_date,
-      summary_3lines: [
-        `‘${article.title}’ 기사의 핵심 맥락 및 배경 분석`,
-        `‘${axes.x_axis}’ 측면에서의 주요 이해관계자 논조 점검`,
-        `사회적 파급력 및 향후 여론 지형에 미칠 데이터 지표 확인`
-      ],
-      keywords: [article.publisher, '이슈', '정책', '동향'],
+      summary_3lines,
+      keywords,
       coordinates: {
         x,
         y,
@@ -327,7 +378,7 @@ export class GroqAnalysisService {
         color_hex,
         color_label
       },
-      ai_rationale: `기사 제목과 논조를 바탕으로 X축(${axes.x_axis}) ${x > 0 ? '+' : ''}${x}, 파급력 Y축 ${y > 0 ? '+' : ''}${y}, 신뢰도 Z축 ${z > 0 ? '+' : ''}${z}로 평가되었습니다.`
+      ai_rationale: `기사 실제 보도 내용에 근거하여 X축(${axes.x_axis}) ${x > 0 ? '+' : ''}${x}, 파급력 Y축 ${y > 0 ? '+' : ''}${y}, 신뢰도 Z축 ${z > 0 ? '+' : ''}${z}로 좌표화되었습니다.`
     };
   }
 }

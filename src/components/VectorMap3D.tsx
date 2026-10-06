@@ -108,6 +108,14 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       targetPos.set(dist, 0, 0);
     } else if (cameraPresetCommand === 'RESET') {
       targetPos.set(22, 18, 26);
+    } else if (cameraPresetCommand.startsWith('ZOOM_IN')) {
+      const dir = camera.position.clone().sub(controls.target);
+      targetPos.copy(controls.target).add(dir.multiplyScalar(0.72));
+      targetLook.copy(controls.target);
+    } else if (cameraPresetCommand.startsWith('ZOOM_OUT')) {
+      const dir = camera.position.clone().sub(controls.target);
+      targetPos.copy(controls.target).add(dir.multiplyScalar(1.35));
+      targetLook.copy(controls.target);
     }
 
     // Smooth transition
@@ -331,10 +339,10 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
         const dropPoints = [new THREE.Vector3(px, py, pz), new THREE.Vector3(px, 0, pz)];
         const dropGeom = new THREE.BufferGeometry().setFromPoints(dropPoints);
         const dropMat = new THREE.LineDashedMaterial({
-          color: new THREE.Color(art.coordinates.color_hex),
+          color: new THREE.Color(hasColorAxis ? baseNodeColor : '#475569'),
           dashSize: 0.3,
           gapSize: 0.2,
-          opacity: 0.28,
+          opacity: hasColorAxis ? 0.35 : 0.2,
           transparent: true,
         });
         const dropLine = new THREE.Line(dropGeom, dropMat);
@@ -457,22 +465,51 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       const dx = Math.abs(e.clientX - pointerDownPos.x);
       const dy = Math.abs(e.clientY - pointerDownPos.y);
 
-      // If user barely moved and released quickly, register as intentional node click
-      if (dx < 6 && dy < 6 && dt < 450) {
+      // If user barely moved and released quickly, register as intentional node click / tap
+      const isTouch = e.pointerType === 'touch';
+      const maxDist = isTouch ? 14 : 6;
+      const maxTime = isTouch ? 500 : 450;
+
+      if (dx < maxDist && dy < maxDist && dt < maxTime) {
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(nodesList);
 
+        let targetArt: Article | null = null;
+
         if (intersects.length > 0) {
-          const art = intersects[0].object.userData as Article;
-          onSelectRef.current(art);
+          targetArt = intersects[0].object.userData as Article;
+        } else if (isTouch && nodesList.length > 0) {
+          // Touch device proximity fallback: find closest node on screen within 40px
+          let closestScreenDist = 40;
+          const touchX = e.clientX;
+          const touchY = e.clientY;
+          const screenPos = new THREE.Vector3();
+
+          for (const nodeMesh of nodesList) {
+            screenPos.setFromMatrixPosition(nodeMesh.matrixWorld);
+            screenPos.project(camera);
+            if (screenPos.z < 1) { // in front of camera
+              const sx = ((screenPos.x + 1) * window.innerWidth) / 2;
+              const sy = ((-screenPos.y + 1) * window.innerHeight) / 2;
+              const dist = Math.hypot(touchX - sx, touchY - sy);
+              if (dist < closestScreenDist) {
+                closestScreenDist = dist;
+                targetArt = nodeMesh.userData as Article;
+              }
+            }
+          }
+        }
+
+        if (targetArt) {
+          onSelectRef.current(targetArt);
 
           // Smoothly pan controls target to selected node
-          const targetX = art.coordinates.x * scaleFactor;
-          const targetY = art.coordinates.y * scaleFactor;
-          const targetZ = art.coordinates.z * scaleFactor;
+          const targetX = targetArt.coordinates.x * scaleFactor;
+          const targetY = targetArt.coordinates.y * scaleFactor;
+          const targetZ = targetArt.coordinates.z * scaleFactor;
           controls.target.set(targetX, targetY, targetZ);
         }
       }

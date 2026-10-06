@@ -32,37 +32,58 @@ export class NewsCrawlerService {
   }
 
   /**
-   * Calculates keyword relevance score to weed out unrelated noise
+   * Calculates keyword relevance score to strictly weed out unrelated noise and hallucinations
    */
-  private calculateRelevance(title: string, snippet: string, query: string): number {
+  public calculateRelevance(title: string, snippet: string, query: string): number {
     const titleLower = title.toLowerCase();
     const snippetLower = snippet.toLowerCase();
     const queryLower = query.toLowerCase().trim();
 
     if (!queryLower) return 1.0;
+    if (!titleLower) return -1.0;
 
-    let score = 0;
-    // Exact match bonus
-    if (titleLower.includes(queryLower)) {
-      score += 5.0;
-    } else if (snippetLower.includes(queryLower)) {
-      score += 2.5;
+    const tokens = queryLower.split(/\s+/).filter((t) => t.length > 0);
+    if (tokens.length === 0) return 0;
+
+    const exactInTitle = titleLower.includes(queryLower);
+    const exactInSnippet = snippetLower.includes(queryLower);
+
+    // Single token query: MUST appear in title or snippet
+    if (tokens.length === 1) {
+      const token = tokens[0];
+      if (exactInTitle) {
+        return 10.0; // High relevance: headline match
+      }
+      if (exactInSnippet) {
+        return 3.0; // Snippet match
+      }
+      return -1.0; // Does not appear anywhere -> strictly reject
     }
 
-    const tokens = queryLower.split(/\s+/).filter(Boolean);
-    if (tokens.length > 0) {
-      const tokensInTitle = tokens.filter((t) => titleLower.includes(t)).length;
-      const tokensInSnippet = tokens.filter((t) => snippetLower.includes(t)).length;
+    // Multi-token query: verify occurrence of query terms
+    const tokensInTitle = tokens.filter((t) => titleLower.includes(t));
+    const tokensInSnippet = tokens.filter((t) => snippetLower.includes(t));
+    const allFoundTokens = new Set([...tokensInTitle, ...tokensInSnippet]);
 
-      if (tokens.length >= 2) {
-        if (tokensInTitle === tokens.length) score += 4.0;
-        else if (tokensInTitle + tokensInSnippet >= tokens.length) score += 2.0;
-        else score -= 2.0;
-      } else {
-        if (tokensInTitle > 0) score += 2.0;
-        else if (tokensInSnippet > 0) score += 1.0;
+    // If query has 2 tokens, BOTH must appear across title and snippet
+    if (tokens.length === 2) {
+      if (allFoundTokens.size < 2) {
+        return -1.0;
+      }
+    } else {
+      // If query has 3+ tokens, at least 65% of tokens must be present
+      const matchRatio = allFoundTokens.size / tokens.length;
+      if (matchRatio < 0.65) {
+        return -1.0;
       }
     }
+
+    let score = 2.0;
+    if (exactInTitle) score += 8.0;
+    else if (exactInSnippet) score += 4.0;
+
+    score += tokensInTitle.length * 3.0;
+    score += tokensInSnippet.length * 1.5;
 
     return score;
   }
@@ -233,8 +254,15 @@ export class NewsCrawlerService {
           combined.push(item);
         }
       }
-      if (combined.length >= count) break;
+      if (combined.length >= count * 2) break;
     }
+
+    // Sort by strict relevance score descending
+    combined.sort((a, b) => {
+      const scoreA = this.calculateRelevance(a.title, a.snippet || '', query);
+      const scoreB = this.calculateRelevance(b.title, b.snippet || '', query);
+      return scoreB - scoreA;
+    });
 
     return combined.slice(0, count);
   }
