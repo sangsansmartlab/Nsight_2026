@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { VectorMap3D } from './components/VectorMap3D';
 import { DEMO_DATASETS } from './data/mockDatasets';
 import { Article } from './types';
@@ -11,12 +11,15 @@ import {
   Sliders,
   Eye,
   CheckCircle2,
-  Info
+  Info,
+  Search,
+  X
 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentQuery, setCurrentQuery] = useState<string>('AI 기본법');
   const [dataset, setDataset] = useState(DEMO_DATASETS['AI 기본법']);
+  const [searchFilter, setSearchFilter] = useState<string>('');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(
     DEMO_DATASETS['AI 기본법'].articles[0] // Default select the (0,0,0) baseline article for immediate visual engagement
   );
@@ -51,13 +54,28 @@ export const App: React.FC = () => {
     setCameraPresetCommand(preset);
   };
 
+  const filteredArticles = useMemo(() => {
+    const query = searchFilter.trim().toLowerCase();
+    if (!query) return dataset.articles;
+    return dataset.articles.filter(
+      (article) =>
+        article.title.toLowerCase().includes(query) ||
+        article.keywords.some((kw) => kw.toLowerCase().includes(query))
+    );
+  }, [dataset.articles, searchFilter]);
+
+  const activeSelectedArticle = useMemo(() => {
+    if (!selectedArticle) return null;
+    return filteredArticles.some((a) => a.id === selectedArticle.id) ? selectedArticle : null;
+  }, [filteredArticles, selectedArticle]);
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 select-none font-sans">
       {/* 3D WebGL Canvas Layer */}
       <VectorMap3D
-        articles={dataset.articles}
+        articles={filteredArticles}
         axes={dataset.axes}
-        selectedArticle={selectedArticle}
+        selectedArticle={activeSelectedArticle}
         hoveredArticle={hoveredArticle}
         scaleFactor={scaleFactor}
         showFloorGrid={showFloorGrid}
@@ -92,6 +110,31 @@ export const App: React.FC = () => {
                 상산고등학교 SMARTLAB · Dynamic Fade & 미니멀 축 뱃지
               </p>
             </div>
+          </div>
+
+          {/* Global Search Input (Filter by Title or Keyword) - Positioned left of View Presets */}
+          <div className="relative flex items-center bg-slate-900/95 rounded-lg border border-blue-500/40 shadow-sm shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all text-xs">
+            <span className="text-blue-400 pl-2.5 pr-1 text-[11px] font-semibold flex items-center gap-1 shrink-0">
+              <Search className="w-3.5 h-3.5 text-blue-400" />
+              검색:
+            </span>
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="제목 또는 키워드 입력..."
+              aria-label="기사 제목 또는 키워드 검색"
+              className="bg-transparent text-white placeholder-slate-400 px-2 py-1.5 w-48 sm:w-64 focus:outline-none text-xs"
+            />
+            {searchFilter && (
+              <button
+                onClick={() => setSearchFilter('')}
+                className="mr-1.5 p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                title="검색어 지우기"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Camera View Presets */}
@@ -304,31 +347,31 @@ export const App: React.FC = () => {
         )}
 
         {/* Right Detail Inspector Panel (Selected Article) */}
-        {selectedArticle && (
+        {activeSelectedArticle && (
           <aside className="pointer-events-auto absolute top-20 right-4 w-92 max-w-[calc(100vw-2rem)] clean-panel p-4 rounded-2xl space-y-3.5 border border-slate-700/80 shadow-2xl">
             {/* Header / Publisher / Title */}
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                    {selectedArticle.publisher}
+                    {activeSelectedArticle.publisher}
                   </span>
                   <span className="text-[10px] text-slate-400 font-mono">
-                    {selectedArticle.pub_date}
+                    {activeSelectedArticle.pub_date}
                   </span>
                   <span
                     className="text-[10px] px-2 py-0.5 rounded font-semibold"
                     style={{
-                      backgroundColor: `${selectedArticle.coordinates.color_hex}22`,
-                      color: selectedArticle.coordinates.color_hex,
-                      border: `1px solid ${selectedArticle.coordinates.color_hex}44`
+                      backgroundColor: `${activeSelectedArticle.coordinates.color_hex}22`,
+                      color: activeSelectedArticle.coordinates.color_hex,
+                      border: `1px solid ${activeSelectedArticle.coordinates.color_hex}44`
                     }}
                   >
-                    {selectedArticle.coordinates.color_label}
+                    {activeSelectedArticle.coordinates.color_label}
                   </span>
                 </div>
                 <h2 className="text-xs font-bold text-white mt-1 leading-snug">
-                  {selectedArticle.title}
+                  {activeSelectedArticle.title}
                 </h2>
               </div>
               <button
@@ -356,9 +399,9 @@ export const App: React.FC = () => {
                 <div className="flex justify-between text-[11px]">
                   <span className="text-rose-400 font-bold">X축 (가로 쟁점)</span>
                   <span className="font-mono font-bold text-rose-400">
-                    {selectedArticle.coordinates.x > 0
-                      ? `+${selectedArticle.coordinates.x.toFixed(2)}`
-                      : selectedArticle.coordinates.x.toFixed(2)}
+                    {activeSelectedArticle.coordinates.x > 0
+                      ? `+${activeSelectedArticle.coordinates.x.toFixed(2)}`
+                      : activeSelectedArticle.coordinates.x.toFixed(2)}
                   </span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden relative">
@@ -367,11 +410,11 @@ export const App: React.FC = () => {
                   <div
                     className="bg-rose-500 h-full transition-all duration-300"
                     style={{
-                      width: `${Math.abs(selectedArticle.coordinates.x) * 50}%`,
+                      width: `${Math.abs(activeSelectedArticle.coordinates.x) * 50}%`,
                       marginLeft:
-                        selectedArticle.coordinates.x >= 0
+                        activeSelectedArticle.coordinates.x >= 0
                           ? '50%'
-                          : `${50 - Math.abs(selectedArticle.coordinates.x) * 50}%`,
+                          : `${50 - Math.abs(activeSelectedArticle.coordinates.x) * 50}%`,
                     }}
                   />
                 </div>
@@ -382,9 +425,9 @@ export const App: React.FC = () => {
                 <div className="flex justify-between text-[11px]">
                   <span className="text-emerald-400 font-bold">Y축 (사회적 파급력)</span>
                   <span className="font-mono font-bold text-emerald-400">
-                    {selectedArticle.coordinates.y > 0
-                      ? `+${selectedArticle.coordinates.y.toFixed(2)}`
-                      : selectedArticle.coordinates.y.toFixed(2)}
+                    {activeSelectedArticle.coordinates.y > 0
+                      ? `+${activeSelectedArticle.coordinates.y.toFixed(2)}`
+                      : activeSelectedArticle.coordinates.y.toFixed(2)}
                   </span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden relative">
@@ -392,11 +435,11 @@ export const App: React.FC = () => {
                   <div
                     className="bg-emerald-500 h-full transition-all duration-300"
                     style={{
-                      width: `${Math.abs(selectedArticle.coordinates.y) * 50}%`,
+                      width: `${Math.abs(activeSelectedArticle.coordinates.y) * 50}%`,
                       marginLeft:
-                        selectedArticle.coordinates.y >= 0
+                        activeSelectedArticle.coordinates.y >= 0
                           ? '50%'
-                          : `${50 - Math.abs(selectedArticle.coordinates.y) * 50}%`,
+                          : `${50 - Math.abs(activeSelectedArticle.coordinates.y) * 50}%`,
                     }}
                   />
                 </div>
@@ -407,9 +450,9 @@ export const App: React.FC = () => {
                 <div className="flex justify-between text-[11px]">
                   <span className="text-purple-400 font-bold">Z축 (신뢰도/근거)</span>
                   <span className="font-mono font-bold text-purple-400">
-                    {selectedArticle.coordinates.z > 0
-                      ? `+${selectedArticle.coordinates.z.toFixed(2)}`
-                      : selectedArticle.coordinates.z.toFixed(2)}
+                    {activeSelectedArticle.coordinates.z > 0
+                      ? `+${activeSelectedArticle.coordinates.z.toFixed(2)}`
+                      : activeSelectedArticle.coordinates.z.toFixed(2)}
                   </span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden relative">
@@ -417,16 +460,32 @@ export const App: React.FC = () => {
                   <div
                     className="bg-purple-500 h-full transition-all duration-300"
                     style={{
-                      width: `${Math.abs(selectedArticle.coordinates.z) * 50}%`,
+                      width: `${Math.abs(activeSelectedArticle.coordinates.z) * 50}%`,
                       marginLeft:
-                        selectedArticle.coordinates.z >= 0
+                        activeSelectedArticle.coordinates.z >= 0
                           ? '50%'
-                          : `${50 - Math.abs(selectedArticle.coordinates.z) * 50}%`,
+                          : `${50 - Math.abs(activeSelectedArticle.coordinates.z) * 50}%`,
                     }}
                   />
                 </div>
               </div>
             </div>
+
+            {/* Keywords */}
+            {activeSelectedArticle.keywords && activeSelectedArticle.keywords.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {activeSelectedArticle.keywords.map((kw, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSearchFilter(kw)}
+                    className="text-[10px] px-2 py-0.5 rounded-md bg-slate-800/90 hover:bg-blue-500/20 text-slate-300 hover:text-blue-300 border border-slate-700/80 hover:border-blue-500/40 transition-colors"
+                    title={`"${kw}" 키워드로 필터링`}
+                  >
+                    #{kw}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* AI 3-Line Summary */}
             <div className="space-y-1.5 text-xs">
@@ -434,7 +493,7 @@ export const App: React.FC = () => {
                 <span>📝 AI 3줄 요약</span>
               </h4>
               <ul className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 space-y-1.5 text-[11px] text-slate-300 list-disc list-inside">
-                {selectedArticle.summary_3lines.map((line, idx) => (
+                {activeSelectedArticle.summary_3lines.map((line, idx) => (
                   <li key={idx} className="leading-snug">
                     {line}
                   </li>
@@ -443,14 +502,14 @@ export const App: React.FC = () => {
             </div>
 
             {/* AI Rationale */}
-            {selectedArticle.ai_rationale && (
+            {activeSelectedArticle.ai_rationale && (
               <div className="space-y-1 text-xs">
                 <h4 className="font-bold text-slate-300 flex items-center gap-1">
                   <Info className="w-3.5 h-3.5 text-blue-400" />
                   <span>💡 AI 좌표 산출 근거</span>
                 </h4>
                 <p className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
-                  {selectedArticle.ai_rationale}
+                  {activeSelectedArticle.ai_rationale}
                 </p>
               </div>
             )}
@@ -458,7 +517,7 @@ export const App: React.FC = () => {
             {/* Actions */}
             <div className="flex gap-2 pt-1">
               <a
-                href={selectedArticle.origin_link}
+                href={activeSelectedArticle.origin_link}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
@@ -491,7 +550,10 @@ export const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 text-[11px] font-mono">
-            <span className="text-slate-400">노드: {dataset.articles.length}개 로드됨</span>
+            <span className="text-slate-400">
+              노드: {filteredArticles.length}
+              {searchFilter.trim() ? ` / ${dataset.articles.length}` : ''}개 로드됨
+            </span>
             <span className="text-slate-500">|</span>
             <span className="text-blue-400">made by SMARTLAB 김태호</span>
           </div>
