@@ -38,14 +38,20 @@ export interface CustomAxesInput {
   color_axis: string;
 }
 
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+// Groq Active Production Model Tier (Defaulting to qwen/qwen3.8-27b with multi-model fallback)
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
+const FALLBACK_MODELS = [
+  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b'
+];
 
 /**
- * Service to execute multi-dimensional news analysis using Groq with 5-key failover
+ * Service to execute multi-dimensional news analysis using Groq with 5-key failover and model fallback
  */
 export class GroqAnalysisService {
   /**
-   * Analyzes an article using Groq LLM with automatic key pool failover
+   * Analyzes an article using Groq LLM with automatic key pool failover and model fallback
    */
   public async analyzeArticle(
     article: ArticleInput,
@@ -53,7 +59,8 @@ export class GroqAnalysisService {
     modelOverride?: string
   ): Promise<AnalyzedArticle> {
     const totalConfiguredKeys = groqKeyManager.getConfiguredCount();
-    const modelToUse = modelOverride || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const requestedModel = modelOverride || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
+    const modelsToTry = Array.from(new Set([requestedModel, ...FALLBACK_MODELS]));
 
     // If no Groq API keys are provided in .env, return a deterministic high-fidelity simulation
     if (totalConfiguredKeys === 0) {
@@ -63,14 +70,15 @@ export class GroqAnalysisService {
     const maxAttempts = Math.min(5, Math.max(1, totalConfiguredKeys));
     let lastError: any = null;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const keyInfo = groqKeyManager.getNextKey();
-      if (!keyInfo) {
-        break;
-      }
+    for (const modelToUse of modelsToTry) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const keyInfo = groqKeyManager.getNextKey();
+        if (!keyInfo) {
+          break;
+        }
 
-      try {
-        const groq = new Groq({ apiKey: keyInfo.key });
+        try {
+          const groq = new Groq({ apiKey: keyInfo.key });
 
         const prompt = `
 당신은 상산고등학교 SMARTLAB의 다차원 뉴스 인텔리전스 분석 AI입니다.
@@ -168,12 +176,22 @@ export class GroqAnalysisService {
           err?.message || err
         );
 
+        // If model not found or no access (404), break immediately to try next fallback model
+        const isModelNotFound =
+          err?.status === 404 ||
+          (err?.message && (err.message.includes('model_not_found') || err.message.includes('does not exist')));
+        if (isModelNotFound) {
+          console.warn(`[GroqAnalysisService] Model '${modelToUse}' not available on Groq, trying next fallback model...`);
+          break;
+        }
+
         // If rate limit (429), mark slot in cooldown
         if (err?.status === 429 || (err?.message && err.message.includes('rate limit'))) {
           groqKeyManager.reportRateLimit(keyInfo.slotId, 60);
         }
       }
     }
+  }
 
     console.warn('[GroqAnalysisService] All Groq key attempts failed. Falling back to simulation.', lastError?.message);
     return this.generateSimulatedAnalysis(article, axes);

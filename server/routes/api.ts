@@ -23,7 +23,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  */
 apiRouter.get('/groq/models', (_req: Request, res: Response) => {
   res.json({
-    currentDefault: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+    currentDefault: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
     models: GROQ_AVAILABLE_MODELS
   });
 });
