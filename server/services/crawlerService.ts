@@ -80,10 +80,12 @@ export class NewsCrawlerService {
 
   /**
    * Node.js DOM parser crawler (Cheerio - works identically to BS4 in Node.js runtime)
+   * Ranked strictly by ACCURACY and filtered by Relevance Guard.
    */
   public async searchWithDomParser(query: string, count: number): Promise<CrawledArticle[]> {
     const encoded = encodeURIComponent(query);
-    const url = `https://search.daum.net/search?w=news&q=${encoded}&sort=recency`;
+    // Enforce sort=accuracy
+    const url = `https://search.daum.net/search?w=news&q=${encoded}&sort=accuracy`;
 
     const response = await axios.get(url, {
       headers: {
@@ -96,6 +98,7 @@ export class NewsCrawlerService {
 
     const $ = cheerio.load(response.data);
     const results: CrawledArticle[] = [];
+    const queryTokens = query.toLowerCase().split(/\s+/).filter(Boolean);
 
     const items = $('div.c-item-doc, ul.c-list-basic > li');
     items.each((idx, el) => {
@@ -123,9 +126,15 @@ export class NewsCrawlerService {
       const snippet = descText || title;
 
       const dateText = $el.find('.sub-time, .txt_time').first().text().trim();
-      const pubDate = dateText || '최신';
+      const pubDate = dateText || '최근';
 
-      if (title && link) {
+      // Relevance check: title or snippet must contain query tokens
+      const textToScan = `${title} ${snippet}`.toLowerCase();
+      const hasAllTokens = queryTokens.length <= 1 
+        ? queryTokens.some(t => textToScan.includes(t))
+        : queryTokens.every(t => textToScan.includes(t));
+
+      if (title && link && hasAllTokens) {
         results.push({
           id: `crawl_${Date.now()}_${idx + 1}`,
           title,
