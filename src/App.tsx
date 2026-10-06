@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { VectorMap3D } from './components/VectorMap3D';
-import { DEMO_DATASETS } from './data/mockDatasets';
+import { DEMO_DATASETS, DatasetItem } from './data/mockDatasets';
 import { Article } from './types';
 import {
   Box,
@@ -12,13 +12,18 @@ import {
   CheckCircle2,
   Info,
   Search,
-  X
+  X,
+  Cpu,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentQuery, setCurrentQuery] = useState<string>('AI 기본법');
-  const [dataset, setDataset] = useState(DEMO_DATASETS['AI 기본법']);
+  const [dataset, setDataset] = useState<DatasetItem>(DEMO_DATASETS['AI 기본법']);
   const [searchFilter, setSearchFilter] = useState<string>('');
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [groqKeyCount, setGroqKeyCount] = useState<number>(0);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(
     DEMO_DATASETS['AI 기본법'].articles[0] // Default select the (0,0,0) baseline article for immediate visual engagement
   );
@@ -35,11 +40,25 @@ export const App: React.FC = () => {
   const [cameraPresetCommand, setCameraPresetCommand] = useState<string>('RESET');
   const [activePreset, setActivePreset] = useState<string>('RESET');
 
+  // Check Groq Key Pool health on mount
+  useEffect(() => {
+    fetch('/api/v1/groq/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.configuredCount !== undefined) {
+          setGroqKeyCount(data.configuredCount);
+        }
+      })
+      .catch(() => {
+        // Fallback silently
+      });
+  }, []);
+
   const handleSelectDataset = (key: string) => {
     setCurrentQuery(key);
+    setSearchFilter('');
     const newDataset = DEMO_DATASETS[key];
     setDataset(newDataset);
-    // Automatically select the center baseline article if available
     const centerArt = newDataset.articles.find(
       (a) => Math.abs(a.coordinates.x) < 0.05 && Math.abs(a.coordinates.y) < 0.05
     );
@@ -53,15 +72,63 @@ export const App: React.FC = () => {
     setCameraPresetCommand(preset);
   };
 
+  // Perform real-time Groq Search & 4D Vectorization
+  const handlePerformGroqSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchFilter.trim();
+    if (!query) return;
+
+    // If query matches a preset topic, switch directly
+    if (DEMO_DATASETS[query]) {
+      handleSelectDataset(query);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const res = await fetch('/api/v1/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          display_count: 15,
+          custom_axes: dataset.axes
+        })
+      });
+
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+
+      if (data.articles && data.articles.length > 0) {
+        const dynamicDataset: DatasetItem = {
+          id: `dynamic_${Date.now()}`,
+          name: query,
+          axes: data.axes || dataset.axes,
+          articles: data.articles
+        };
+        setDataset(dynamicDataset);
+        setCurrentQuery(query);
+        setSelectedArticle(data.articles[0]);
+        setCameraPresetCommand('RESET');
+        setActivePreset('RESET');
+      }
+    } catch (err) {
+      console.error('[Groq Search Error]:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const filteredArticles = useMemo(() => {
     const query = searchFilter.trim().toLowerCase();
-    if (!query) return dataset.articles;
+    // If not actively searching via API, perform in-memory keyword highlight/filter
+    if (!query || isSearching) return dataset.articles;
     return dataset.articles.filter(
       (article) =>
         article.title.toLowerCase().includes(query) ||
         article.keywords.some((kw) => kw.toLowerCase().includes(query))
     );
-  }, [dataset.articles, searchFilter]);
+  }, [dataset.articles, searchFilter, isSearching]);
 
   const activeSelectedArticle = useMemo(() => {
     if (!selectedArticle) return null;
@@ -101,8 +168,9 @@ export const App: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold tracking-tight text-white">NSight 3D Vector Map</h1>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold">
-                  (0,0,0) 중심 좌표계
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold flex items-center gap-1">
+                  <Cpu className="w-3 h-3 text-blue-400" />
+                  Groq 5-Key Pool {groqKeyCount > 0 ? `(${groqKeyCount}개 활성)` : '(준비됨)'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
@@ -111,8 +179,11 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Global Search Input (Filter by Title or Keyword) - Positioned left of View Presets */}
-          <div className="relative flex items-center bg-slate-900/95 rounded-lg border border-blue-500/40 shadow-sm shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all text-xs">
+          {/* Real-time Groq Search Bar */}
+          <form
+            onSubmit={handlePerformGroqSearch}
+            className="relative flex items-center bg-slate-900/95 rounded-lg border border-blue-500/40 shadow-sm shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all text-xs"
+          >
             <span className="text-blue-400 pl-2.5 pr-1 text-[11px] font-semibold flex items-center gap-1 shrink-0">
               <Search className="w-3.5 h-3.5 text-blue-400" />
               검색:
@@ -121,20 +192,39 @@ export const App: React.FC = () => {
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="제목 또는 키워드 입력..."
-              aria-label="기사 제목 또는 키워드 검색"
+              placeholder="새 이슈 입력 후 Enter (Groq 실시간 분석)..."
+              aria-label="기사 검색 및 Groq 4D 분석"
               className="bg-transparent text-white placeholder-slate-400 px-2 py-1.5 w-48 sm:w-64 focus:outline-none text-xs"
             />
             {searchFilter && (
               <button
+                type="button"
                 onClick={() => setSearchFilter('')}
-                className="mr-1.5 p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="mr-1 p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
                 title="검색어 지우기"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
-          </div>
+            <button
+              type="submit"
+              disabled={isSearching || !searchFilter.trim()}
+              className="mr-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-[11px] transition-all flex items-center gap-1 shadow-sm"
+              title="Groq 5개 키 로테이션으로 실시간 분석 수행"
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>분석 중</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <span>Groq 분석</span>
+                </>
+              )}
+            </button>
+          </form>
 
           {/* Camera View Presets */}
           <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800 text-xs">
@@ -188,7 +278,7 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 text-xs">
             <span className="text-slate-400 px-1 text-[11px] font-medium flex items-center gap-1">
               <Layers className="w-3.5 h-3.5 text-indigo-400" />
-              이슈:
+              프리셋:
             </span>
             {Object.keys(DEMO_DATASETS).map((key) => (
               <button
