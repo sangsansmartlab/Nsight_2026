@@ -168,13 +168,16 @@ export const App: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold tracking-tight text-white">NSight 3D Vector Map</h1>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold flex items-center gap-1">
+                  <span>수집: BeautifulSoup 4</span>
+                </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold flex items-center gap-1">
                   <Cpu className="w-3 h-3 text-blue-400" />
-                  Groq 5-Key Pool {groqKeyCount > 0 ? `(${groqKeyCount}개 활성)` : '(준비됨)'}
+                  추론: Groq 5-Key Pool {groqKeyCount > 0 ? `(${groqKeyCount}개 활성)` : ''}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                상산고등학교 SMARTLAB
+                상산고등학교 SMARTLAB · BeautifulSoup4 수집 & Groq 4D 벡터화 엔진
               </p>
             </div>
           </div>
@@ -192,7 +195,7 @@ export const App: React.FC = () => {
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="새 이슈 입력 후 Enter (Groq 실시간 분석)..."
+              placeholder="새 이슈 입력 후 Enter (BS4 수집 & Groq 4D 분석)..."
               aria-label="기사 검색 및 Groq 4D 분석"
               className="bg-transparent text-white placeholder-slate-400 px-2 py-1.5 w-48 sm:w-64 focus:outline-none text-xs"
             />

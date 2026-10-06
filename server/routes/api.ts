@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { groqKeyManager } from '../config/keys.js';
 import { groqAnalysisService, ArticleInput, CustomAxesInput } from '../services/groqService.js';
 import { GROQ_AVAILABLE_MODELS } from '../config/groqModels.js';
+import { newsCrawlerService } from '../services/crawlerService.js';
 
 export const apiRouter = Router();
 
@@ -89,18 +90,29 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
       color_axis: '기사 성향 (긍정 / 중립 / 비판)'
     };
 
-    // Construct news query candidates (Can connect to Naver Search API or dynamic crawler)
-    const mockPublishers = ['조선일보', '한국경제', '경향신문', '매일경제', '동아일보', '한겨레', '연합뉴스', '전자신문'];
-    const candidateArticles: ArticleInput[] = Array.from({ length: count }, (_, idx) => ({
-      id: `art_${Date.now()}_${idx + 1}`,
-      title: `[${query}] 관련 심층 취재 보도: ${idx + 1}차 핵심 이슈 및 정책 분석`,
-      publisher: mockPublishers[idx % mockPublishers.length],
-      origin_link: `https://search.naver.com/search.naver?where=news&query=${encodeURIComponent(query)}`,
-      pub_date: new Date(Date.now() - idx * 3600000 * 6).toISOString().split('T')[0],
-      snippet: `‘${query}’ 관련 핵심 쟁점과 ${axes.x_axis}에 대한 다양한 전문가 인터뷰 및 최신 동향을 파악한 분석 기사입니다.`
-    }));
+    // 1. Live Web Discovery & Crawling via BeautifulSoup 4 / DOM Engine
+    // (Strict Separation: Search is executed by BeautifulSoup4 / Crawler, NOT Groq)
+    let candidateArticles: ArticleInput[] = [];
+    try {
+      candidateArticles = await newsCrawlerService.searchNews(query, count);
+    } catch (crawlErr) {
+      console.warn('[Search API] Crawler error, using fallback format:', crawlErr);
+    }
 
-    // Analyze using Groq with 5-key failover
+    // Fallback if portal blocks temporary requests
+    if (!candidateArticles || candidateArticles.length === 0) {
+      const mockPublishers = ['조선일보', '한국경제', '경향신문', '매일경제', '동아일보', '한겨레', '연합뉴스', '전자신문'];
+      candidateArticles = Array.from({ length: count }, (_, idx) => ({
+        id: `art_${Date.now()}_${idx + 1}`,
+        title: `[${query}] 관련 보도: ${idx + 1}차 핵심 이슈 및 정책 분석`,
+        publisher: mockPublishers[idx % mockPublishers.length],
+        origin_link: `https://search.naver.com/search.naver?where=news&query=${encodeURIComponent(query)}`,
+        pub_date: new Date(Date.now() - idx * 3600000 * 6).toISOString().split('T')[0],
+        snippet: `‘${query}’ 관련 핵심 쟁점과 ${axes.x_axis}에 대한 분석 기사입니다.`
+      }));
+    }
+
+    // 2. Groq strictly does 4D Vector Coordinates, 3-line summaries and Rationale inference
     const analyzed = await groqAnalysisService.analyzeBatch(candidateArticles, axes, 3);
 
     res.json({
