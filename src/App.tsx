@@ -5,7 +5,6 @@ import { Article } from './types';
 import {
   Box,
   Layers,
-  Sparkles,
   ExternalLink,
   RotateCcw,
   Sliders,
@@ -107,7 +106,7 @@ export const App: React.FC = () => {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                상산고등학교 SMARTLAB · Dynamic Fade & 미니멀 축 뱃지
+                상산고등학교 SMARTLAB
               </p>
             </div>
           </div>
@@ -209,17 +208,6 @@ export const App: React.FC = () => {
 
         {/* Left Side Controls & Legend Panel */}
         <div className="pointer-events-auto absolute top-20 left-4 w-76 max-w-[calc(100vw-2rem)] space-y-2.5">
-          {/* Dynamic Fade Explanation Banner */}
-          <div className="clean-panel p-3 rounded-xl text-[11px] text-slate-300 space-y-1.5 bg-indigo-950/40 border-indigo-500/30 shadow-lg">
-            <div className="font-bold text-indigo-300 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>✨ Dynamic Fade 동작 방식</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed text-[11px]">
-              마우스 휠로 카메라를 확대(Zoom In)하거나 시선 각도가 축 라벨과 겹치면 <strong className="text-white font-medium">축 라벨이 자동으로 투명화</strong>되어 시야를 방해하지 않습니다.
-            </p>
-          </div>
-
           {/* X · Y · Z Coordinate Axes Breakdown */}
           <div className="clean-panel p-3.5 rounded-xl space-y-2.5 text-xs shadow-xl">
             <div className="flex items-center justify-between">
