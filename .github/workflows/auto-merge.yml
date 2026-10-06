@@ -1,0 +1,39 @@
+name: Universal Auto Push
+
+on:
+  push:
+  workflow_dispatch:
+  # 필요에 따라 정기 실행(schedule)이나 issue/PR 등 추가 이벤트 지정 가능
+
+jobs:
+  auto-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # 현재 이벤트가 일어난 체크아웃 브랜치/Ref를 그대로 사용
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and Push Changes
+        run: |
+          # 현재 작업 중인 브랜치명 동적 추출
+          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+          echo "Current branch: $CURRENT_BRANCH"
+
+          # 스테이징되지 않은 변경사항 및 새로 생성된 파일 등록
+          git add -A
+
+          # 변경사항(diff)이 있는 경우에만 커밋 및 푸시 실행
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: auto-commit changes from workflow [skip ci]"
+            git push origin HEAD:$CURRENT_BRANCH
+          else
+            echo "No changes detected to commit."
+          fi
