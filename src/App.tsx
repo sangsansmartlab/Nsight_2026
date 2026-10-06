@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { VectorMap3D } from './components/VectorMap3D';
 import { DEMO_DATASETS, DatasetItem } from './data/mockDatasets';
-import { Article } from './types';
+import { Article, CustomAxes } from './types';
 import {
   Box,
   Layers,
   ExternalLink,
   RotateCcw,
   Sliders,
+  SlidersHorizontal,
   Eye,
   CheckCircle2,
   Info,
@@ -15,8 +16,42 @@ import {
   X,
   Cpu,
   Loader2,
-  Sparkles
+  ChevronLeft,
+  ChevronRight,
+  Settings2,
+  Check,
+  RefreshCw,
+  Compass,
+  Hash
 } from 'lucide-react';
+
+// Preset templates for custom 4D axes
+const AXIS_PRESET_TEMPLATES: Record<string, CustomAxes> = {
+  '기본 균형형': {
+    x_axis: '규제 중심 (-1.0) ↔ 중심 (0.0) ↔ 산업 진흥 (+1.0)',
+    y_axis: '낮은 파급력 (-1.0) ↔ 기준 (0.0) ↔ 높은 파급력 (+1.0)',
+    z_axis: '낮은 신뢰도 (-1.0) ↔ 중립 (0.0) ↔ 높은 신뢰도 (+1.0)',
+    color_axis: '기사 성향 (핵심, 우려, 진흥, 윤리, 건설적)'
+  },
+  '정치·정책형': {
+    x_axis: '여당 / 정책 지지 (-1.0) ↔ 중립 ↔ 야당 / 비판 (+1.0)',
+    y_axis: '단기 여론 영향 (-1.0) ↔ 보통 ↔ 법제화 파급력 (+1.0)',
+    z_axis: '정치적 공방 (-1.0) ↔ 중립 ↔ 공인 팩트/실증 (+1.0)',
+    color_axis: '논조 성향 (찬성, 반대, 중립, 심층분석)'
+  },
+  '기술·혁신형': {
+    x_axis: '안전성 / 윤리 검증 (-1.0) ↔ 균형 ↔ 기술 혁신 / 속도 (+1.0)',
+    y_axis: '실험실 시제품 (-1.0) ↔ 상용화 ↔ 산업 패러다임 전환 (+1.0)',
+    z_axis: '단순 마케팅 홍보 (-1.0) ↔ 중립 ↔ 기술/학술적 실증 (+1.0)',
+    color_axis: '기술 평가 (돌파구, 과열, 안정, 관망)'
+  },
+  '경제·시장형': {
+    x_axis: '긴축 / 리스크 우려 (-1.0) ↔ 중립 ↔ 성장 / 투자 호재 (+1.0)',
+    y_axis: '개별 기업 이슈 (-1.0) ↔ 섹터 영향 ↔ 거시경제 파급 (+1.0)',
+    z_axis: '시장 루머/추측 (-1.0) ↔ 중립 ↔ 정량 공시/재무 데이터 (+1.0)',
+    color_axis: '시장 반응 (호재, 악재, 중립, 변동성)'
+  }
+};
 
 export const App: React.FC = () => {
   const [currentQuery, setCurrentQuery] = useState<string>('AI 기본법');
@@ -25,11 +60,25 @@ export const App: React.FC = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [groqKeyCount, setGroqKeyCount] = useState<number>(0);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(
-    DEMO_DATASETS['AI 기본법'].articles[0] // Default select the (0,0,0) baseline article for immediate visual engagement
+    DEMO_DATASETS['AI 기본법'].articles[0]
   );
   const [hoveredArticle, setHoveredArticle] = useState<Article | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [scaleFactor, setScaleFactor] = useState<number>(12);
+
+  // Left sidebar collapse / expand state
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(true);
+
+  // Search customization settings modal/popover state
+  const [isCustomSettingsOpen, setIsCustomSettingsOpen] = useState<boolean>(false);
+  const [searchCount, setSearchCount] = useState<number>(15); // Range 1 ~ 100
+  const [customAxes, setCustomAxes] = useState<CustomAxes>({
+    x_axis: DEMO_DATASETS['AI 기본법'].axes.x_axis,
+    y_axis: DEMO_DATASETS['AI 기본법'].axes.y_axis,
+    z_axis: DEMO_DATASETS['AI 기본법'].axes.z_axis,
+    color_axis: DEMO_DATASETS['AI 기본법'].axes.color_axis
+  });
+  const [axisSaveToast, setAxisSaveToast] = useState<string | null>(null);
 
   // Grid visibility states
   const [showFloorGrid, setShowFloorGrid] = useState<boolean>(true);
@@ -59,6 +108,7 @@ export const App: React.FC = () => {
     setSearchFilter('');
     const newDataset = DEMO_DATASETS[key];
     setDataset(newDataset);
+    setCustomAxes({ ...newDataset.axes });
     const centerArt = newDataset.articles.find(
       (a) => Math.abs(a.coordinates.x) < 0.05 && Math.abs(a.coordinates.y) < 0.05
     );
@@ -72,27 +122,33 @@ export const App: React.FC = () => {
     setCameraPresetCommand(preset);
   };
 
-  // Perform real-time Groq Search & 4D Vectorization
-  const handlePerformGroqSearch = async (e?: React.FormEvent) => {
+  // Apply custom axes to current dataset view immediately
+  const handleApplyAxesToCurrentView = () => {
+    setDataset((prev) => ({
+      ...prev,
+      axes: { ...customAxes }
+    }));
+    setAxisSaveToast('설정한 축 기준이 현재 3D 공간에 즉시 적용되었습니다.');
+    setTimeout(() => setAxisSaveToast(null), 3000);
+  };
+
+  // Perform real-time Search & 4D Vectorization with custom count and axes
+  const handlePerformSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = searchFilter.trim();
     if (!query) return;
 
-    // If query matches a preset topic, switch directly
-    if (DEMO_DATASETS[query]) {
-      handleSelectDataset(query);
-      return;
-    }
-
     setIsSearching(true);
+    setIsCustomSettingsOpen(false);
+
     try {
       const res = await fetch('/api/v1/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query,
-          display_count: 15,
-          custom_axes: dataset.axes
+          display_count: Math.min(100, Math.max(1, searchCount)),
+          custom_axes: customAxes
         })
       });
 
@@ -103,7 +159,7 @@ export const App: React.FC = () => {
         const dynamicDataset: DatasetItem = {
           id: `dynamic_${Date.now()}`,
           name: query,
-          axes: data.axes || dataset.axes,
+          axes: data.axes || customAxes,
           articles: data.articles
         };
         setDataset(dynamicDataset);
@@ -113,7 +169,7 @@ export const App: React.FC = () => {
         setActivePreset('RESET');
       }
     } catch (err) {
-      console.error('[Groq Search Error]:', err);
+      console.error('[Search Error]:', err);
     } finally {
       setIsSearching(false);
     }
@@ -173,61 +229,75 @@ export const App: React.FC = () => {
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold flex items-center gap-1">
                   <Cpu className="w-3 h-3 text-blue-400" />
-                  추론: Groq 5-Key Pool {groqKeyCount > 0 ? `(${groqKeyCount}개 활성)` : ''}
+                  추론 엔진 {groqKeyCount > 0 ? `(${groqKeyCount}키 로테이션)` : ''}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                상산고등학교 SMARTLAB · BeautifulSoup4 수집 & Groq 4D 벡터화 엔진
+                상산고등학교 SMARTLAB · 실시간 다차원 뉴스 벡터화 & 3D 시각화 플랫폼
               </p>
             </div>
           </div>
 
-          {/* Real-time Groq Search Bar */}
-          <form
-            onSubmit={handlePerformGroqSearch}
-            className="relative flex items-center bg-slate-900/95 rounded-lg border border-blue-500/40 shadow-sm shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all text-xs"
-          >
-            <span className="text-blue-400 pl-2.5 pr-1 text-[11px] font-semibold flex items-center gap-1 shrink-0">
-              <Search className="w-3.5 h-3.5 text-blue-400" />
-              검색:
-            </span>
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="새 이슈 입력 후 Enter (BS4 수집 & Groq 4D 분석)..."
-              aria-label="기사 검색 및 Groq 4D 분석"
-              className="bg-transparent text-white placeholder-slate-400 px-2 py-1.5 w-48 sm:w-64 focus:outline-none text-xs"
-            />
-            {searchFilter && (
+          {/* Search Bar with Customization Trigger and 🔍 Search Button */}
+          <div className="relative flex items-center gap-1.5">
+            <form
+              onSubmit={handlePerformSearch}
+              className="relative flex items-center bg-slate-900/95 rounded-lg border border-blue-500/40 shadow-sm shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all text-xs"
+            >
+              {/* Settings / Customize Toggle Button */}
               <button
                 type="button"
-                onClick={() => setSearchFilter('')}
-                className="mr-1 p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                title="검색어 지우기"
+                onClick={() => setIsCustomSettingsOpen(!isCustomSettingsOpen)}
+                className={`ml-1 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
+                  isCustomSettingsOpen
+                    ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="검색 조건 커스터마이징 (개수 1~100, X/Y/Z/Color 축 설정)"
               >
-                <X className="w-3.5 h-3.5" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-[11px] font-medium hidden sm:inline">
+                  옵션 ({searchCount}개)
+                </span>
               </button>
-            )}
-            <button
-              type="submit"
-              disabled={isSearching || !searchFilter.trim()}
-              className="mr-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-[11px] transition-all flex items-center gap-1 shadow-sm"
-              title="Groq 5개 키 로테이션으로 실시간 분석 수행"
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>분석 중</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3 h-3 text-amber-300" />
-                  <span>Groq 분석</span>
-                </>
+
+              <div className="w-[1px] h-4 bg-slate-700/80 mx-1" />
+
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="검색할 뉴스 키워드 입력 후 🔍 클릭..."
+                aria-label="뉴스 키워드 검색"
+                className="bg-transparent text-white placeholder-slate-400 px-2 py-1.5 w-48 sm:w-60 focus:outline-none text-xs"
+              />
+
+              {searchFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSearchFilter('')}
+                  className="mr-1 p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                  title="검색어 지우기"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
-            </button>
-          </form>
+
+              {/* Clean 🔍 Search Icon Button */}
+              <button
+                type="submit"
+                disabled={isSearching || !searchFilter.trim()}
+                className="mr-1 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm shadow-blue-600/30"
+                title="검색 실행 (1~100개 수집 및 사용자 맞춤 축 4D 벡터화)"
+              >
+                {isSearching ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <Search className="w-4 h-4 text-white" />
+                )}
+              </button>
+            </form>
+          </div>
 
           {/* Camera View Presets */}
           <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800 text-xs">
@@ -299,111 +369,344 @@ export const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Left Side Controls & Legend Panel */}
-        <div className="pointer-events-auto absolute top-20 left-4 w-76 max-w-[calc(100vw-2rem)] space-y-2.5">
-          {/* X · Y · Z Coordinate Axes Breakdown */}
-          <div className="clean-panel p-3.5 rounded-xl space-y-2.5 text-xs shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-200 tracking-wider flex items-center gap-1.5 text-xs">
-                <Box className="w-3.5 h-3.5 text-blue-400" />
-                <span>📐 X · Y · Z 축 범주 안내</span>
-              </h3>
-              <span className="text-[10px] text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded font-mono font-medium">
-                Dynamic Badge
-              </span>
+        {/* Search Customization Modal / Dropdown Panel */}
+        {isCustomSettingsOpen && (
+          <div className="pointer-events-auto absolute top-20 right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-40 w-96 sm:w-[32rem] max-w-[calc(100vw-2rem)] clean-panel p-5 rounded-2xl border border-blue-500/40 shadow-2xl backdrop-blur-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-blue-400" />
+                <h3 className="font-bold text-white text-sm">검색 커스터마이징 & 축 설정</h3>
+              </div>
+              <button
+                onClick={() => setIsCustomSettingsOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                title="닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="space-y-2">
-              {/* X Axis */}
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-rose-500 space-y-1">
-                <div className="text-rose-400 font-bold flex justify-between items-center text-xs">
-                  <span>X축 (가로 쟁점)</span>
-                  <span className="text-[10px] font-mono text-slate-400">-1.0 ~ +1.0</span>
+            {/* 1. Article Count Selection (1 ~ 100) */}
+            <div className="space-y-2 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5 text-sky-400" />
+                  수집 자료 개수 범위
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={searchCount}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) {
+                        setSearchCount(Math.min(100, Math.max(1, val)));
+                      }
+                    }}
+                    className="w-16 px-2 py-0.5 rounded bg-slate-950 border border-blue-500/40 text-center font-mono font-bold text-blue-400 text-xs focus:outline-none focus:border-blue-400"
+                  />
+                  <span className="text-slate-400 text-xs">개 (1~100)</span>
                 </div>
-                <p className="text-slate-300 text-[11px] leading-snug font-medium">
-                  {dataset.axes.x_axis}
-                </p>
               </div>
 
-              {/* Y Axis */}
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-emerald-500 space-y-1">
-                <div className="text-emerald-400 font-bold flex justify-between items-center text-xs">
-                  <span>Y축 (높이 / 파급력)</span>
-                  <span className="text-[10px] font-mono text-slate-400">-1.0 ~ +1.0</span>
-                </div>
-                <p className="text-slate-300 text-[11px] leading-snug font-medium">
-                  {dataset.axes.y_axis}
-                </p>
+              {/* Slider (1~100) */}
+              <input
+                type="range"
+                min="1"
+                max="100"
+                value={searchCount}
+                onChange={(e) => setSearchCount(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+
+              {/* Preset Quick Buttons */}
+              <div className="flex items-center justify-between gap-1 pt-1">
+                {[5, 15, 30, 50, 100].map((cnt) => (
+                  <button
+                    key={cnt}
+                    type="button"
+                    onClick={() => setSearchCount(cnt)}
+                    className={`flex-1 py-1 text-[11px] font-medium rounded-md transition-all ${
+                      searchCount === cnt
+                        ? 'bg-blue-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {cnt}개
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Custom Axes Configuration */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-indigo-400" />
+                  4D 분석 축 사용자 직접 정의
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">X · Y · Z · Color</span>
               </div>
 
-              {/* Z Axis */}
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-purple-500 space-y-1">
-                <div className="text-purple-400 font-bold flex justify-between items-center text-xs">
-                  <span>Z축 (깊이 / 신뢰도)</span>
-                  <span className="text-[10px] font-mono text-slate-400">-1.0 ~ +1.0</span>
-                </div>
-                <p className="text-slate-300 text-[11px] leading-snug font-medium">
-                  {dataset.axes.z_axis}
-                </p>
+              {/* Preset Template Quick Selector */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
+                <span className="text-slate-400 shrink-0 mr-1 text-[10px]">프리셋:</span>
+                {Object.entries(AXIS_PRESET_TEMPLATES).map(([name, axes]) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setCustomAxes({ ...axes })}
+                    className="shrink-0 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors border border-slate-700/60"
+                  >
+                    {name}
+                  </button>
+                ))}
               </div>
+
+              {/* Axes Inputs */}
+              <div className="space-y-2 text-xs">
+                {/* X Axis */}
+                <div className="space-y-1">
+                  <label className="text-rose-400 font-semibold flex items-center justify-between text-[11px]">
+                    <span>X축 (가로 쟁점 대립각)</span>
+                    <span className="text-[10px] text-slate-400 font-mono">-1.0 ~ +1.0</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customAxes.x_axis}
+                    onChange={(e) => setCustomAxes({ ...customAxes, x_axis: e.target.value })}
+                    placeholder="예: 규제 중심 (-1.0) ↔ 산업 진흥 (+1.0)"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-rose-500/30 text-white focus:outline-none focus:border-rose-400 text-xs"
+                  />
+                </div>
+
+                {/* Y Axis */}
+                <div className="space-y-1">
+                  <label className="text-emerald-400 font-semibold flex items-center justify-between text-[11px]">
+                    <span>Y축 (파급력 & 사회적 영향도)</span>
+                    <span className="text-[10px] text-slate-400 font-mono">-1.0 ~ +1.0</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customAxes.y_axis}
+                    onChange={(e) => setCustomAxes({ ...customAxes, y_axis: e.target.value })}
+                    placeholder="예: 낮은 파급력 (-1.0) ↔ 높은 파급력 (+1.0)"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/30 text-white focus:outline-none focus:border-emerald-400 text-xs"
+                  />
+                </div>
+
+                {/* Z Axis */}
+                <div className="space-y-1">
+                  <label className="text-purple-400 font-semibold flex items-center justify-between text-[11px]">
+                    <span>Z축 (정보 신뢰도 & 객관성)</span>
+                    <span className="text-[10px] text-slate-400 font-mono">-1.0 ~ +1.0</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customAxes.z_axis}
+                    onChange={(e) => setCustomAxes({ ...customAxes, z_axis: e.target.value })}
+                    placeholder="예: 낮은 신뢰도 (-1.0) ↔ 높은 신뢰도 (+1.0)"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-purple-500/30 text-white focus:outline-none focus:border-purple-400 text-xs"
+                  />
+                </div>
+
+                {/* Color Axis */}
+                <div className="space-y-1">
+                  <label className="text-blue-400 font-semibold flex items-center justify-between text-[11px]">
+                    <span>Color축 (노드 색상 / 기사 성향 기준)</span>
+                    <span className="text-[10px] text-slate-400 font-mono">색상 구분</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customAxes.color_axis}
+                    onChange={(e) => setCustomAxes({ ...customAxes, color_axis: e.target.value })}
+                    placeholder="예: 기사 성향 (긍정 / 중립 / 비판 / 우려)"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-blue-500/30 text-white focus:outline-none focus:border-blue-400 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Toast feedback */}
+            {axisSaveToast && (
+              <div className="p-2 bg-emerald-500/20 border border-emerald-500/40 rounded-lg text-emerald-300 text-[11px] flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{axisSaveToast}</span>
+              </div>
+            )}
+
+            {/* Modal Bottom Actions */}
+            <div className="flex gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={handleApplyAxesToCurrentView}
+                className="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                <span>현재 화면에 축 적용</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (searchFilter.trim()) {
+                    handlePerformSearch();
+                  } else {
+                    setIsCustomSettingsOpen(false);
+                  }
+                }}
+                className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>{searchFilter.trim() ? '이 설정으로 검색' : '설정 완료'}</span>
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Scale & Grid Options */}
-          <div className="clean-panel p-3 rounded-xl space-y-2.5 text-xs shadow-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-300 font-medium flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5 text-blue-400" />
-                공간 간격 확대
-              </span>
-              <span className="text-blue-400 font-mono text-xs">{scaleFactor}x</span>
-            </div>
-            <input
-              type="range"
-              min="8"
-              max="20"
-              value={scaleFactor}
-              onChange={(e) => setScaleFactor(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
-            />
-
-            {/* Grid Plane Visibility Toggles */}
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">평면 격자:</span>
-              <div className="flex gap-1">
+        {/* Collapsible Left Side Controls & Legend Panel */}
+        <div className="pointer-events-auto absolute top-20 left-4 z-30">
+          {isLeftPanelOpen ? (
+            <div className="w-80 max-w-[calc(100vw-2rem)] space-y-2.5 transition-all duration-300 ease-out">
+              {/* Header with Collapse Button */}
+              <div className="clean-panel p-2.5 rounded-xl flex items-center justify-between border border-white/10 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <Box className="w-4 h-4 text-blue-400" />
+                  <span className="font-bold text-xs text-white">축 범주 & 공간 제어</span>
+                </div>
                 <button
-                  onClick={() => setShowFloorGrid(!showFloorGrid)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
-                    showFloorGrid
-                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                      : 'bg-slate-900 text-slate-500 border-slate-800'
-                  }`}
+                  type="button"
+                  onClick={() => setIsLeftPanelOpen(false)}
+                  className="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1 transition-colors"
+                  title="왼쪽 탭 접기"
                 >
-                  XZ 바닥
-                </button>
-                <button
-                  onClick={() => setShowXYGrid(!showXYGrid)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
-                    showXYGrid
-                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                      : 'bg-slate-900 text-slate-500 border-slate-800'
-                  }`}
-                >
-                  XY 정면
-                </button>
-                <button
-                  onClick={() => setShowYZGrid(!showYZGrid)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
-                    showYZGrid
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                      : 'bg-slate-900 text-slate-500 border-slate-800'
-                  }`}
-                >
-                  YZ 측면
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>접기</span>
                 </button>
               </div>
+
+              {/* X · Y · Z Coordinate Axes Breakdown */}
+              <div className="clean-panel p-3.5 rounded-xl space-y-2.5 text-xs shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-slate-200 tracking-wider flex items-center gap-1.5 text-xs">
+                    <span>📐 X · Y · Z 축 범주 안내</span>
+                  </h3>
+                  <button
+                    onClick={() => setIsCustomSettingsOpen(true)}
+                    className="text-[10px] text-blue-400 bg-blue-500/20 hover:bg-blue-500/30 px-2 py-0.5 rounded font-mono font-medium flex items-center gap-1 transition-colors"
+                    title="축 직접 편집하기"
+                  >
+                    <span>축 편집</span>
+                    <SlidersHorizontal className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {/* X Axis */}
+                  <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-rose-500 space-y-1">
+                    <div className="text-rose-400 font-bold flex justify-between items-center text-xs">
+                      <span>X축 (가로 쟁점)</span>
+                      <span className="text-[10px] font-mono text-slate-400">-1.0 ~ +1.0</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-snug font-medium break-words">
+                      {dataset.axes.x_axis}
+                    </p>
+                  </div>
+
+                  {/* Y Axis */}
+                  <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-emerald-500 space-y-1">
+                    <div className="text-emerald-400 font-bold flex justify-between items-center text-xs">
+                      <span>Y축 (높이 / 파급력)</span>
+                      <span className="text-[10px] font-mono text-slate-400">-1.0 ~ +1.0</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-snug font-medium break-words">
+                      {dataset.axes.y_axis}
+                    </p>
+                  </div>
+
+                  {/* Z Axis */}
+                  <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-purple-500 space-y-1">
+                    <div className="text-purple-400 font-bold flex justify-between items-center text-xs">
+                      <span>Z축 (깊이 / 신뢰도)</span>
+                      <span className="text-[10px] font-mono text-slate-400">-1.0 ~ +1.0</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-snug font-medium break-words">
+                      {dataset.axes.z_axis}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scale & Grid Options */}
+              <div className="clean-panel p-3 rounded-xl space-y-2.5 text-xs shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300 font-medium flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                    공간 간격 확대
+                  </span>
+                  <span className="text-blue-400 font-mono text-xs">{scaleFactor}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="8"
+                  max="20"
+                  value={scaleFactor}
+                  onChange={(e) => setScaleFactor(Number(e.target.value))}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+
+                {/* Grid Plane Visibility Toggles */}
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">평면 격자:</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setShowFloorGrid(!showFloorGrid)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                        showFloorGrid
+                          ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                      }`}
+                    >
+                      XZ 바닥
+                    </button>
+                    <button
+                      onClick={() => setShowXYGrid(!showXYGrid)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                        showXYGrid
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                      }`}
+                    >
+                      XY 정면
+                    </button>
+                    <button
+                      onClick={() => setShowYZGrid(!showYZGrid)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                        showYZGrid
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                      }`}
+                    >
+                      YZ 측면
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Minimized Tab Button when Collapsed */
+            <button
+              type="button"
+              onClick={() => setIsLeftPanelOpen(true)}
+              className="clean-panel px-3 py-2.5 rounded-xl border border-blue-500/40 shadow-2xl flex items-center gap-2 text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800/90 transition-all hover:scale-105 active:scale-95"
+              title="축 범주 및 공간 설정 탭 펼치기"
+            >
+              <ChevronRight className="w-4 h-4 text-blue-400" />
+              <Box className="w-3.5 h-3.5 text-blue-400" />
+              <span>축 범주 및 뷰 설정</span>
+            </button>
+          )}
         </div>
 
         {/* Hover Tooltip (Mouse Cursor Following) */}
@@ -478,7 +781,7 @@ export const App: React.FC = () => {
               {/* X Axis Meter */}
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-rose-400 font-bold">X축 (가로 쟁점)</span>
+                  <span className="text-rose-400 font-bold">X축 ({dataset.axes.x_axis.includes('↔') ? dataset.axes.x_axis.split('↔')[0]?.trim().slice(0, 8) : '가로 쟁점'})</span>
                   <span className="font-mono font-bold text-rose-400">
                     {activeSelectedArticle.coordinates.x > 0
                       ? `+${activeSelectedArticle.coordinates.x.toFixed(2)}`
@@ -529,7 +832,7 @@ export const App: React.FC = () => {
               {/* Z Axis Meter */}
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-purple-400 font-bold">Z축 (신뢰도/근거)</span>
+                  <span className="text-purple-400 font-bold">Z축 (신뢰도/객관성)</span>
                   <span className="font-mono font-bold text-purple-400">
                     {activeSelectedArticle.coordinates.z > 0
                       ? `+${activeSelectedArticle.coordinates.z.toFixed(2)}`
@@ -633,10 +936,8 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-3 text-[11px] font-mono">
             <span className="text-slate-400">
               노드: {filteredArticles.length}
-              {searchFilter.trim() ? ` / ${dataset.articles.length}` : ''}개 로드됨
+              {searchFilter.trim() ? ` / ${dataset.articles.length}` : ''}개 로드됨 (설정 수량: {searchCount}개)
             </span>
-            <span className="text-slate-500">|</span>
-            <span className="text-blue-400">made by SMARTLAB 김태호</span>
           </div>
         </footer>
 

@@ -240,9 +240,26 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
     disposables.push(zLineGeom, zLineMat);
 
     // Dynamic Axis Minimal Badges at edge boundaries (+bound)
-    const xLabelText = `X: ${axes.x_axis.includes('↔') ? axes.x_axis.split('↔')[1]?.trim() || '가로축' : '규제 ↔ 진흥'}`;
-    const yLabelText = `Y: ${axes.y_axis.includes('↔') ? axes.y_axis.split('↔')[1]?.trim() || '높이' : '파급력'}`;
-    const zLabelText = `Z: ${axes.z_axis.includes('↔') ? axes.z_axis.split('↔')[1]?.trim() || '깊이' : '신뢰도'}`;
+    const formatAxisLabel = (prefix: string, fullText: string, fallback: string) => {
+      if (!fullText) return `${prefix}: ${fallback}`;
+      let clean = fullText;
+      if (clean.includes('↔')) {
+        const parts = clean.split('↔');
+        const lastPart = parts[parts.length - 1]?.trim().replace(/\(\+1\.0\)/g, '').trim();
+        const firstPart = parts[0]?.trim().replace(/\(-1\.0\)/g, '').trim();
+        if (firstPart && lastPart) {
+          clean = `${firstPart} ↔ ${lastPart}`;
+        }
+      }
+      if (clean.length > 22) {
+        clean = clean.slice(0, 20) + '…';
+      }
+      return `${prefix}: ${clean}`;
+    };
+
+    const xLabelText = formatAxisLabel('X', axes.x_axis, '가로 쟁점');
+    const yLabelText = formatAxisLabel('Y', axes.y_axis, '사회적 파급력');
+    const zLabelText = formatAxisLabel('Z', axes.z_axis, '정보 신뢰도');
 
     const xLabel = createMinimalBadgeSprite(xLabelText, '#f43f5e', 'rgba(15,23,42,0.88)', '#f43f5e');
     xLabel.position.set(bound + 2.0, 0, 0);

@@ -84,68 +84,79 @@ export class NewsCrawlerService {
    */
   public async searchWithDomParser(query: string, count: number): Promise<CrawledArticle[]> {
     const encoded = encodeURIComponent(query);
-    // Enforce sort=accuracy
-    const url = `https://search.daum.net/search?w=news&q=${encoded}&sort=accuracy`;
-
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
-      },
-      timeout: 8000
-    });
-
-    const $ = cheerio.load(response.data);
     const results: CrawledArticle[] = [];
     const queryTokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const maxPages = Math.min(8, Math.max(1, Math.ceil(count / 12)));
 
-    const items = $('div.c-item-doc, ul.c-list-basic > li');
-    items.each((idx, el) => {
-      if (results.length >= count) return false;
-
-      const $el = $(el);
-      const titleLink = $el.find('.item-title a, strong.tit-g a, a.tit_main').first();
-      if (!titleLink.length) return;
-
-      const title = titleLink.text().trim();
-      const link = titleLink.attr('href') || '';
-
-      const pressText = $el
-        .find('.item-sub .sub-info, .info_cp, .item-title ~ .item-sub')
-        .first()
-        .text()
-        .trim();
-      const publisher = pressText ? pressText.split(/\s+/)[0] : '언론사';
-
-      const descText = $el
-        .find('.item-contents .item-body, .desc, p.conts-desc')
-        .first()
-        .text()
-        .trim();
-      const snippet = descText || title;
-
-      const dateText = $el.find('.sub-time, .txt_time').first().text().trim();
-      const pubDate = dateText || '최근';
-
-      // Relevance check: title or snippet must contain query tokens
-      const textToScan = `${title} ${snippet}`.toLowerCase();
-      const hasAllTokens = queryTokens.length <= 1 
-        ? queryTokens.some(t => textToScan.includes(t))
-        : queryTokens.every(t => textToScan.includes(t));
-
-      if (title && link && hasAllTokens) {
-        results.push({
-          id: `crawl_${Date.now()}_${idx + 1}`,
-          title,
-          publisher: publisher || '주요언론',
-          origin_link: link,
-          pub_date: pubDate,
-          snippet,
-          crawler: 'BeautifulSoup4' // Equivalent BS4 DOM parsing
+    for (let page = 1; page <= maxPages && results.length < count; page++) {
+      try {
+        const url = `https://search.daum.net/search?w=news&q=${encoded}&sort=accuracy&p=${page}`;
+        const response = await axios.get(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+          },
+          timeout: 6000
         });
+
+        const $ = cheerio.load(response.data);
+        const items = $('div.c-item-doc, ul.c-list-basic > li');
+        if (items.length === 0) break;
+
+        items.each((idx, el) => {
+          if (results.length >= count) return false;
+
+          const $el = $(el);
+          const titleLink = $el.find('.item-title a, strong.tit-g a, a.tit_main').first();
+          if (!titleLink.length) return;
+
+          const title = titleLink.text().trim();
+          const link = titleLink.attr('href') || '';
+
+          const pressText = $el
+            .find('.item-sub .sub-info, .info_cp, .item-title ~ .item-sub')
+            .first()
+            .text()
+            .trim();
+          const publisher = pressText ? pressText.split(/\s+/)[0] : '언론사';
+
+          const descText = $el
+            .find('.item-contents .item-body, .desc, p.conts-desc')
+            .first()
+            .text()
+            .trim();
+          const snippet = descText || title;
+
+          const dateText = $el.find('.sub-time, .txt_time').first().text().trim();
+          const pubDate = dateText || '최근';
+
+          // Relevance check: title or snippet must contain query tokens
+          const textToScan = `${title} ${snippet}`.toLowerCase();
+          const hasAllTokens = queryTokens.length <= 1 
+            ? queryTokens.some(t => textToScan.includes(t))
+            : queryTokens.every(t => textToScan.includes(t));
+
+          if (title && link && hasAllTokens) {
+            // Avoid duplicate links
+            if (!results.some(r => r.origin_link === link || r.title === title)) {
+              results.push({
+                id: `crawl_${Date.now()}_${results.length + 1}`,
+                title,
+                publisher: publisher || '주요언론',
+                origin_link: link,
+                pub_date: pubDate,
+                snippet,
+                crawler: 'BeautifulSoup4' // Equivalent BS4 DOM parsing
+              });
+            }
+          }
+        });
+      } catch (pageErr) {
+        console.warn(`[DOM Scraper] Error scraping page ${page}:`, pageErr);
+        break;
       }
-    });
+    }
 
     return results;
   }
