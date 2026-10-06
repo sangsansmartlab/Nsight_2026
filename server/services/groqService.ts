@@ -260,31 +260,51 @@ export class GroqAnalysisService {
       axes.color_axis.includes('정치') ||
       axes.x_axis.includes('정당');
 
-    let color_hex = '#3B82F6';
-    let color_label = '중립/건설적';
+    let color_hex = '#38BDF8';
+    let color_label = '중립/기준';
 
-    if (isPolitics) {
-      // Politics Domain: Conservative = Red (#EF4444), Progressive = Blue (#3B82F6), Neutral = White (#F8FAFC)
-      if (x > 0.15) {
-        color_hex = '#EF4444';
-        color_label = '보수 성향';
-      } else if (x < -0.15) {
-        color_hex = '#3B82F6';
-        color_label = '진보 성향';
+    if (axes.color_axis && axes.color_axis.trim()) {
+      if (isPolitics) {
+        // Continuous color mapping based on sign AND magnitude
+        if (x <= -0.6) {
+          color_hex = '#1E3A8A';
+          color_label = `진보 성향 (강, ${x.toFixed(2)})`;
+        } else if (x <= -0.2) {
+          color_hex = '#2563EB';
+          color_label = `진보 성향 (중, ${x.toFixed(2)})`;
+        } else if (x < -0.08) {
+          color_hex = '#60A5FA';
+          color_label = `온건 진보 (약, ${x.toFixed(2)})`;
+        } else if (x >= 0.6) {
+          color_hex = '#991B1B';
+          color_label = `보수 성향 (강, +${x.toFixed(2)})`;
+        } else if (x >= 0.2) {
+          color_hex = '#DC2626';
+          color_label = `보수 성향 (중, +${x.toFixed(2)})`;
+        } else if (x > 0.08) {
+          color_hex = '#F87171';
+          color_label = `온건 보수 (약, +${x.toFixed(2)})`;
+        } else {
+          color_hex = '#FFFFFF';
+          color_label = `중립/중도 (${x >= 0 ? '+' : ''}${x.toFixed(2)})`;
+        }
       } else {
-        color_hex = '#F8FAFC';
-        color_label = '중립/객관';
-      }
-    } else {
-      if (x > 0.3) {
-        color_hex = '#10B981';
-        color_label = '진흥/긍정';
-      } else if (x < -0.3) {
-        color_hex = '#EF4444';
-        color_label = '규제/우려';
-      } else if (y > 0.5) {
-        color_hex = '#F59E0B';
-        color_label = '핵심/고파급';
+        if (x <= -0.5) {
+          color_hex = '#991B1B';
+          color_label = `규제/우려 (강, ${x.toFixed(2)})`;
+        } else if (x < -0.08) {
+          color_hex = '#F87171';
+          color_label = `규제/우려 (약, ${x.toFixed(2)})`;
+        } else if (x >= 0.5) {
+          color_hex = '#065F46';
+          color_label = `진흥/호재 (강, +${x.toFixed(2)})`;
+        } else if (x > 0.08) {
+          color_hex = '#34D399';
+          color_label = `진흥/호재 (약, +${x.toFixed(2)})`;
+        } else {
+          color_hex = '#FFFFFF';
+          color_label = `중립/기준 (${x >= 0 ? '+' : ''}${x.toFixed(2)})`;
+        }
       }
     }
 

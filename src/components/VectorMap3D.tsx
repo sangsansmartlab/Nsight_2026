@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Article, CustomAxes } from '../types';
+import { getContinuousColor, isPoliticsDomain } from '../utils/colorScale';
 
 interface VectorMap3DProps {
   articles: Article[];
@@ -303,7 +304,9 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       
       // Color is used only when 4D Color axis is explicitly defined
       const hasColorAxis = Boolean(axes.color_axis && axes.color_axis.trim());
-      const baseNodeColor = hasColorAxis ? (art.coordinates.color_hex || '#38bdf8') : '#38bdf8';
+      const isPol = isPoliticsDomain(axes.color_axis, axes.x_axis);
+      const continuousInfo = getContinuousColor(art.coordinates.x, isPol);
+      const baseNodeColor = hasColorAxis ? continuousInfo.hex : '#38bdf8';
       const colorHex = isSelected ? '#F59E0B' : baseNodeColor;
 
       const sphereGeo = new THREE.SphereGeometry(radius, 32, 32);

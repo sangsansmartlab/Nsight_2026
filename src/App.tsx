@@ -24,6 +24,7 @@ import {
   Hash,
   Palette
 } from 'lucide-react';
+import { getContinuousColor, isPoliticsDomain } from './utils/colorScale';
 
 export type DomainType = 'POLITICS' | 'BUSINESS' | 'TECH' | 'GENERAL';
 
@@ -771,28 +772,62 @@ export const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* 4D Political Color Legend Summary - ONLY when 4D Color axis is actively defined */}
-              {isColorAxisActive && dataset.axes.color_axis.includes('보수') && (
-                <div className="clean-panel p-2.5 rounded-xl text-xs space-y-1.5 border border-slate-700/80">
-                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-200">
-                    <span>🏛️ 4차원 정치 성향 색상 지표</span>
-                    <span className="text-[10px] text-slate-400 font-mono">4D Active</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <span className="flex items-center gap-1 text-blue-400 font-bold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-sm shadow-blue-500/50" />
-                      진보 (-1.0)
-                    </span>
-                    <span className="flex items-center gap-1 text-white font-bold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-white inline-block shadow-sm shadow-white/50" />
-                      중립 (0.0)
-                    </span>
-                    <span className="flex items-center gap-1 text-rose-400 font-bold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shadow-sm shadow-rose-500/50" />
-                      보수 (+1.0)
-                    </span>
-                  </div>
-                </div>
+              {/* 4D Continuous Color Scale & Criteria - ONLY when 4D Color axis is actively defined */}
+              {isColorAxisActive && (
+                (() => {
+                  const isPol = isPoliticsDomain(dataset.axes.color_axis, dataset.axes.x_axis);
+                  return (
+                    <div className="clean-panel p-3 rounded-xl text-xs space-y-2.5 border border-slate-700/80 shadow-lg">
+                      <div className="flex justify-between items-center text-[11px] font-bold text-slate-200">
+                        <span className="flex items-center gap-1.5 text-blue-400">
+                          <Palette className="w-3.5 h-3.5" />
+                          <span>🎨 4차원 색상 기준 & 연속 그라데이션</span>
+                        </span>
+                        <span className="text-[10px] text-amber-400 font-mono font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                          수치별 색상 분기
+                        </span>
+                      </div>
+
+                      {/* Continuous Gradient Bar */}
+                      <div className="space-y-1">
+                        <div
+                          className="w-full h-3 rounded-full border border-white/20 shadow-inner"
+                          style={{
+                            background: isPol
+                              ? 'linear-gradient(to right, #1E3A8A 0%, #2563EB 25%, #93C5FD 45%, #FFFFFF 50%, #FCA5A5 55%, #DC2626 75%, #991B1B 100%)'
+                              : 'linear-gradient(to right, #991B1B 0%, #DC2626 25%, #F87171 45%, #FFFFFF 50%, #6EE7B7 55%, #10B981 75%, #064E3B 100%)'
+                          }}
+                        />
+
+                        {/* Numeric Scale Ticks */}
+                        <div className="flex justify-between text-[9px] font-mono text-slate-400 px-0.5">
+                          <span>-1.0</span>
+                          <span>-0.5</span>
+                          <span className="text-white font-bold">0.0</span>
+                          <span>+0.5</span>
+                          <span>+1.0</span>
+                        </div>
+                      </div>
+
+                      {/* Meaning of Range Poles */}
+                      <div className="grid grid-cols-3 text-center text-[10px] font-semibold pt-1 border-t border-slate-800/80">
+                        <div className="text-left text-blue-400">
+                          {isPol ? '🔵 강한 진보 (-1.0)' : '🔴 강한 규제/악재'}
+                        </div>
+                        <div className="text-center text-white">
+                          ⚪ 중립 (0.0)
+                        </div>
+                        <div className="text-right text-rose-400">
+                          {isPol ? '🔴 강한 보수 (+1.0)' : '🟢 강한 진흥/호재'}
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-slate-400 leading-relaxed bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                        💡 <strong className="text-slate-300">수치 크기별 색상 차등</strong>: 같은 부호라도 절댓값 수치가 클수록 짙은 원색을 띠며, 수치에 따라 채도와 명도가 연속적으로 달라집니다 (0.0에 가까울수록 흰색).
+                      </p>
+                    </div>
+                  );
+                })()
               )}
 
               {/* X · Y · Z Coordinate Axes Breakdown */}
@@ -967,28 +1002,36 @@ export const App: React.FC = () => {
                   </span>
                   
                   {/* Color badge is ONLY displayed when 4D Color axis is present */}
-                  {isColorAxisActive && (
-                    <span
-                      className="text-[10px] px-2 py-0.5 rounded font-semibold"
-                      style={{
-                        backgroundColor:
-                          activeSelectedArticle.coordinates.color_hex === '#F8FAFC'
-                            ? 'rgba(255, 255, 255, 0.15)'
-                            : `${activeSelectedArticle.coordinates.color_hex}22`,
-                        color:
-                          activeSelectedArticle.coordinates.color_hex === '#F8FAFC'
-                            ? '#ffffff'
-                            : activeSelectedArticle.coordinates.color_hex,
-                        border: `1px solid ${
-                          activeSelectedArticle.coordinates.color_hex === '#F8FAFC'
-                            ? 'rgba(255, 255, 255, 0.4)'
-                            : `${activeSelectedArticle.coordinates.color_hex}44`
-                        }`
-                      }}
-                    >
-                      {activeSelectedArticle.coordinates.color_label}
-                    </span>
-                  )}
+                  {isColorAxisActive && (() => {
+                    const isPol = isPoliticsDomain(dataset.axes.color_axis, dataset.axes.x_axis);
+                    const colorResult = getContinuousColor(activeSelectedArticle.coordinates.x, isPol);
+                    return (
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded font-semibold flex items-center gap-1.5 shadow-sm"
+                        style={{
+                          backgroundColor:
+                            colorResult.hex === '#FFFFFF'
+                              ? 'rgba(255, 255, 255, 0.15)'
+                              : `${colorResult.hex}25`,
+                          color:
+                            colorResult.hex === '#FFFFFF'
+                              ? '#ffffff'
+                              : colorResult.hex,
+                          border: `1px solid ${
+                            colorResult.hex === '#FFFFFF'
+                              ? 'rgba(255, 255, 255, 0.4)'
+                              : `${colorResult.hex}55`
+                          }`
+                        }}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full inline-block shadow-sm"
+                          style={{ backgroundColor: colorResult.hex }}
+                        />
+                        <span>{colorResult.label}</span>
+                      </span>
+                    );
+                  })()}
                 </div>
                 <h2 className="text-xs font-bold text-white mt-1 leading-snug">
                   {activeSelectedArticle.title}
