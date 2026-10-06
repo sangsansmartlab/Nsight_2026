@@ -2,6 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { VectorMap3D } from './components/VectorMap3D';
 import { LandingView } from './components/LandingView';
 import { AuthModal, AuthUser } from './components/AuthModal';
+import { SnapshotsDrawer, MapSnapshot, SearchHistoryItem } from './components/SnapshotsDrawer';
+import { AdminDashboardModal } from './components/AdminDashboardModal';
+import { RbacGuardModal } from './components/RbacGuardModal';
+import { exportArticlesToCSV, exportArticlesToJSON, captureCanvasToPNG } from './utils/exportUtils';
 import { DEMO_DATASETS, DatasetItem } from './data/mockDatasets';
 import { Article, CustomAxes } from './types';
 import {
@@ -29,114 +33,24 @@ import {
   ZoomIn,
   ZoomOut,
   Home,
-  LogIn
+  LogIn,
+  Share2,
+  Download,
+  Camera,
+  ShieldAlert,
+  History,
+  FileText,
+  FileSpreadsheet,
+  Image as ImageIcon
 } from 'lucide-react';
 import { getContinuousColor, isPoliticsDomain } from './utils/colorScale';
 
-export type DomainType = 'POLITICS' | 'BUSINESS' | 'TECH' | 'GENERAL';
-
-export interface DomainPresetInfo {
-  domain: DomainType;
-  badgeName: string;
-  axes: CustomAxes;
-}
-
-// Preset templates for custom 4D axes
-export const AXIS_PRESET_TEMPLATES: Record<string, CustomAxes> = {
-  '정치·정책형 (보수🔴/진보🔵/중립⚪)': {
-    x_axis: '진보 성향 (-1.0) ↔ 중도/중립 (0.0) ↔ 보수 성향 (+1.0)',
-    y_axis: '낮은 정국 파급력 (-1.0) ↔ 보통 ↔ 높은 사회적 논란/영향 (+1.0)',
-    z_axis: '정치적 공방/의혹 (-1.0) ↔ 중립 ↔ 공인 팩트/실증 근거 (+1.0)',
-    color_axis: '정치 성향 (보수: 빨강 #EF4444, 진보: 파랑 #3B82F6, 중립: 흰색 #F8FAFC)'
-  },
-  '기업·산업형 (실적/호재/악재)': {
-    x_axis: '실적 악재/리스크 (-1.0) ↔ 중립 (0.0) ↔ 성장 모멘텀/호재 (+1.0)',
-    y_axis: '개별 기업 이슈 (-1.0) ↔ 보통 ↔ 산업군/거시경제 파급 (+1.0)',
-    z_axis: '시장 루머/추측 (-1.0) ↔ 중립 ↔ 정량 공시/재무 데이터 (+1.0)',
-    color_axis: '시장 반응 (호재: 에메랄드 #10B981, 악재: 레드 #EF4444, 중립: 블루 #3B82F6)'
-  },
-  '기술·혁신형 (안전/혁신/검증)': {
-    x_axis: '안전성/윤리 우려 (-1.0) ↔ 균형 (0.0) ↔ 기술 혁신/개발 속도 (+1.0)',
-    y_axis: '연구 시제품 (-1.0) ↔ 상용화 ↔ 산업 대격변 파급력 (+1.0)',
-    z_axis: '단순 홍보 마케팅 (-1.0) ↔ 중립 ↔ 학술/실증적 검증 (+1.0)',
-    color_axis: '기술 평가 (혁신/도약: 청록 #10B981, 우려/경고: 다홍 #EF4444, 분석: 블루 #3B82F6)'
-  },
-  '기본 균형형 (규제/진흥)': {
-    x_axis: '규제 중심 (-1.0) ↔ 중심 (0.0) ↔ 산업 진흥 (+1.0)',
-    y_axis: '낮은 파급력 (-1.0) ↔ 기준 (0.0) ↔ 높은 파급력 (+1.0)',
-    z_axis: '낮은 신뢰도 (-1.0) ↔ 중립 (0.0) ↔ 높은 신뢰도 (+1.0)',
-    color_axis: '기사 성향 (핵심, 우려, 진흥, 윤리, 건설적)'
-  },
-  '3차원 공간 전용 (색상 축 없음)': {
-    x_axis: '대립 쟁점 (-1.0) ↔ 중립 (0.0) ↔ 찬성/진흥 (+1.0)',
-    y_axis: '낮은 파급력 (-1.0) ↔ 보통 (0.0) ↔ 높은 파급력 (+1.0)',
-    z_axis: '낮은 신뢰도 (-1.0) ↔ 중립 (0.0) ↔ 높은 신뢰도 (+1.0)',
-    color_axis: ''
-  }
-};
-
-/**
- * Keyword Domain Preset Detector
- */
-export const detectDomainPreset = (query: string): DomainPresetInfo => {
-  const q = query.toLowerCase().trim();
-
-  // Political keywords
-  const politicsKeywords = [
-    '정치', '대통령', '국회', '총선', '대선', '의원', '여당', '야당', '민주당',
-    '국민의힘', '정당', '보수', '진보', '정부', '개혁', '장관', '법무부', '청와대',
-    '용산', '선거', '공천', '법안', '야권', '여권', '국정감사', '당대표', '청문회',
-    '탄핵', '계엄', '의안', '국회의원', '비대위', '지도부', '지방선거', '특검',
-    '외교', '안보', '남북', '국방', '국무총리', '지지율', '정쟁'
-  ];
-
-  // Corporate / Economy keywords
-  const businessKeywords = [
-    '삼성', '현대', 'sk', 'lg', '카카오', '네이버', '테슬라', '애플', '엔비디아',
-    '구글', '마이크로소프트', '기업', '주가', '실적', '매출', '투자', '코스피',
-    '코스닥', '금리', '환율', '부동산', '경제', '증시', '상장', '배당', '영업이익',
-    '금융', '은행', '증권', '한화', '포스코', '쿠팡', '배민', '현대차', '기아',
-    '하이닉스', '채권', '인플레이션', '소비자물가', 'gdp', '무역', '수출', '재벌',
-    '주총', '어닝', '인수합병', 'm&a', '밸류업'
-  ];
-
-  // Tech / IT keywords
-  const techKeywords = [
-    'ai', '인공지능', '반도체', '로봇', '알고리즘', 'llm', '양자', '우주',
-    '바이오', '소프트웨어', '클라우드', '기술', '특허', '개발', '스타트업',
-    'gpt', '자율주행', '딥러닝', '빅데이터', '드론', '사이버', '스마트폰', '배터리',
-    'hbm', '파운드리', '양자컴퓨터', '신약', '우주선', '누리호'
-  ];
-
-  if (politicsKeywords.some((kw) => q.includes(kw))) {
-    return {
-      domain: 'POLITICS',
-      badgeName: '정치·선거',
-      axes: AXIS_PRESET_TEMPLATES['정치·정책형 (보수🔴/진보🔵/중립⚪)']
-    };
-  }
-
-  if (businessKeywords.some((kw) => q.includes(kw))) {
-    return {
-      domain: 'BUSINESS',
-      badgeName: '기업·경제',
-      axes: AXIS_PRESET_TEMPLATES['기업·산업형 (실적/호재/악재)']
-    };
-  }
-
-  if (techKeywords.some((kw) => q.includes(kw))) {
-    return {
-      domain: 'TECH',
-      badgeName: '기술·IT',
-      axes: AXIS_PRESET_TEMPLATES['기술·혁신형 (안전/혁신/검증)']
-    };
-  }
-
-  return {
-    domain: 'GENERAL',
-    badgeName: '일반·균형',
-    axes: AXIS_PRESET_TEMPLATES['기본 균형형 (규제/진흥)']
-  };
+// Clean default 4D axes (Presets removed per user specification)
+export const DEFAULT_AXES: CustomAxes = {
+  x_axis: '규제 중심 (-1.0) ↔ 중심/균형 (0.0) ↔ 산업 진흥 (+1.0)',
+  y_axis: '낮은 파급력 (-1.0) ↔ 보통 (0.0) ↔ 높은 사회적 파급력 (+1.0)',
+  z_axis: '단순 주장/의혹 (-1.0) ↔ 중립 (0.0) ↔ 공인 실증/신뢰도 (+1.0)',
+  color_axis: '기사 성향 (긍정 / 중립 / 비판)'
 };
 
 export const App: React.FC = () => {
@@ -199,8 +113,13 @@ export const App: React.FC = () => {
   // Default node count set to 30
   const [searchCount, setSearchCount] = useState<number>(30);
 
-  // Auto domain-adaptive axes state
-  const [isAutoAxesEnabled, setIsAutoAxesEnabled] = useState<boolean>(true);
+  // RBAC & Sharing Modals
+  const [isSnapshotsDrawerOpen, setIsSnapshotsDrawerOpen] = useState<boolean>(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
+  const [isRbacGuardOpen, setIsRbacGuardOpen] = useState<boolean>(false);
+  const [rbacGuardFeature, setRbacGuardFeature] = useState<string>('');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState<boolean>(false);
+  const [articleShareToast, setArticleShareToast] = useState<string | null>(null);
 
   // Custom Axes
   const [customAxes, setCustomAxes] = useState<CustomAxes>({
@@ -238,15 +157,6 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // When search query changes and auto-axes is active, dynamically sync axes to the domain
-  useEffect(() => {
-    if (isAutoAxesEnabled && searchFilter.trim()) {
-      const match = detectDomainPreset(searchFilter);
-      setCustomAxes({ ...match.axes });
-      setEnableColorAxis(Boolean(match.axes.color_axis && match.axes.color_axis.trim()));
-    }
-  }, [searchFilter, isAutoAxesEnabled]);
-
   // Check Groq Key Pool health on mount
   useEffect(() => {
     fetch('/api/v1/groq/status')
@@ -260,6 +170,70 @@ export const App: React.FC = () => {
         // Fallback silently
       });
   }, []);
+
+  // RBAC Permission Guard helper
+  const requireAuth = (featureName: string, minRole: 'VERIFIED' | 'ADMIN' = 'VERIFIED'): boolean => {
+    if (!currentUser) {
+      setRbacGuardFeature(featureName);
+      setIsRbacGuardOpen(true);
+      return false;
+    }
+    if (minRole === 'ADMIN' && currentUser.role !== 'ADMIN') {
+      setRbacGuardFeature(`${featureName} (플랫폼 관리자 전용)`);
+      setIsRbacGuardOpen(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleRoleChange = (newRole: 'GUEST' | 'VERIFIED' | 'ADMIN') => {
+    if (!currentUser) return;
+    const updated: AuthUser = { ...currentUser, role: newRole };
+    handleLogin(updated);
+  };
+
+  // Export & Share Handlers
+  const handleShareSpaceURL = () => {
+    if (!requireAuth('3D 지도 고유 링크 공유')) return;
+    const shareUrl = window.location.href;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setAxisSaveToast('3D 공간 공유 링크가 복사되었습니다.');
+        setTimeout(() => setAxisSaveToast(null), 3000);
+      });
+    }
+    setIsExportMenuOpen(false);
+  };
+
+  const handleCapturePNG = () => {
+    if (!requireAuth('3D Canvas 고화질 PNG 캡처')) return;
+    captureCanvasToPNG(`NSight_${currentQuery.replace(/\s+/g, '_')}_3D.png`);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportCSV = () => {
+    if (!requireAuth('분석 데이터 CSV 내보내기')) return;
+    exportArticlesToCSV(currentQuery, filteredArticles, dataset.axes);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportJSON = () => {
+    if (!requireAuth('분석 데이터 JSON 내보내기')) return;
+    exportArticlesToJSON(currentQuery, filteredArticles, dataset.axes);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleShareArticle = (art: Article) => {
+    const summaryText = art.summary_3lines ? art.summary_3lines.map((l) => `• ${l}`).join('\n') : '';
+    const shareText = `[NSight 3D 뉴스 분석]\n📰 제목: ${art.title}\n🏢 언론사: ${art.publisher} (${art.pub_date})\n📍 3D 좌표: X(${art.coordinates.x.toFixed(2)}) Y(${art.coordinates.y.toFixed(2)}) Z(${art.coordinates.z.toFixed(2)})${art.coordinates.color_label ? ` | 🎨 ${art.coordinates.color_label}` : ''}\n📝 3줄 요약:\n${summaryText}\n🔗 원문: ${art.origin_link}`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareText).then(() => {
+        setArticleShareToast('기사 요약 및 3D 분석 데이터가 복사되었습니다.');
+        setTimeout(() => setArticleShareToast(null), 3500);
+      });
+    }
+  };
 
   const handleSelectDataset = (key: string) => {
     setCurrentQuery(key);
@@ -308,11 +282,9 @@ export const App: React.FC = () => {
     setIsSearching(true);
     setIsCustomSettingsOpen(false);
 
-    // If auto-axes is enabled, ensure axes match the query domain
-    const baseAxes = isAutoAxesEnabled ? detectDomainPreset(query).axes : customAxes;
     const axesToUse: CustomAxes = {
-      ...baseAxes,
-      color_axis: enableColorAxis ? baseAxes.color_axis : ''
+      ...customAxes,
+      color_axis: enableColorAxis ? customAxes.color_axis : ''
     };
 
     try {
@@ -345,6 +317,22 @@ export const App: React.FC = () => {
         setActivePreset('RESET');
         setSearchFeedbackToast(null);
         setAppMode('EXPLORER');
+
+        // Automatically record to search history for Verified/Admin users
+        if (currentUser) {
+          const historyStorageKey = `nsight_history_${currentUser.id}`;
+          try {
+            const prevHist: SearchHistoryItem[] = JSON.parse(localStorage.getItem(historyStorageKey) || '[]');
+            const newHistItem: SearchHistoryItem = {
+              id: `hist_${Date.now()}`,
+              query,
+              createdAt: new Date().toLocaleString('ko-KR'),
+              count: data.articles.length
+            };
+            const updatedHist = [newHistItem, ...prevHist.filter((h) => h.query !== query)].slice(0, 50);
+            localStorage.setItem(historyStorageKey, JSON.stringify(updatedHist));
+          } catch {}
+        }
       } else {
         setSearchFeedbackToast(
           data.message || `‘${query}’ 관련 실제 언론사 보도 기사를 찾지 못했습니다. 보다 대중적인 키워드로 검색해 보세요.`
@@ -393,10 +381,18 @@ export const App: React.FC = () => {
           setCustomAxes={setCustomAxes}
           enableColorAxis={enableColorAxis}
           setEnableColorAxis={setEnableColorAxis}
-          isAutoAxesEnabled={isAutoAxesEnabled}
-          setIsAutoAxesEnabled={setIsAutoAxesEnabled}
           currentUser={currentUser}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenSnapshots={() => {
+            if (requireAuth('3D 스냅샷 및 검색 히스토리')) {
+              setIsSnapshotsDrawerOpen(true);
+            }
+          }}
+          onOpenAdmin={() => {
+            if (requireAuth('관리자 대시보드', 'ADMIN')) {
+              setIsAdminModalOpen(true);
+            }
+          }}
           searchFeedbackToast={searchFeedbackToast}
           onClearFeedbackToast={() => setSearchFeedbackToast(null)}
         />
@@ -406,6 +402,42 @@ export const App: React.FC = () => {
           currentUser={currentUser}
           onLogin={handleLogin}
           onLogout={handleLogout}
+        />
+        <SnapshotsDrawer
+          isOpen={isSnapshotsDrawerOpen}
+          onClose={() => setIsSnapshotsDrawerOpen(false)}
+          userId={currentUser?.id || 'guest'}
+          currentDataset={dataset}
+          currentAxes={dataset.axes}
+          currentQuery={currentQuery}
+          onLoadSnapshot={(snapshot) => {
+            setDataset(snapshot.dataset);
+            setCurrentQuery(snapshot.query);
+            setCustomAxes(snapshot.axes);
+            setEnableColorAxis(Boolean(snapshot.axes.color_axis && snapshot.axes.color_axis.trim()));
+            setSelectedArticle(snapshot.dataset.articles[0] || null);
+            setIsSnapshotsDrawerOpen(false);
+            setAppMode('EXPLORER');
+          }}
+          onSelectHistoryQuery={(q) => {
+            setSearchFilter(q);
+            handlePerformSearch(undefined, q);
+            setIsSnapshotsDrawerOpen(false);
+          }}
+        />
+        <AdminDashboardModal
+          isOpen={isAdminModalOpen}
+          onClose={() => setIsAdminModalOpen(false)}
+          currentUser={currentUser}
+          totalArticlesCount={dataset.articles.length}
+          currentQuery={currentQuery}
+          onRoleChange={handleRoleChange}
+        />
+        <RbacGuardModal
+          isOpen={isRbacGuardOpen}
+          onClose={() => setIsRbacGuardOpen(false)}
+          featureName={rbacGuardFeature}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
         />
       </>
     );
