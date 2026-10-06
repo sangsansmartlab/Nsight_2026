@@ -10,7 +10,6 @@ import {
   Sliders,
   SlidersHorizontal,
   Eye,
-  CheckCircle2,
   Info,
   Search,
   X,
@@ -22,35 +21,114 @@ import {
   Check,
   RefreshCw,
   Compass,
-  Hash
+  Hash,
+  Palette
 } from 'lucide-react';
 
+export type DomainType = 'POLITICS' | 'BUSINESS' | 'TECH' | 'GENERAL';
+
+export interface DomainPresetInfo {
+  domain: DomainType;
+  badgeName: string;
+  axes: CustomAxes;
+}
+
 // Preset templates for custom 4D axes
-const AXIS_PRESET_TEMPLATES: Record<string, CustomAxes> = {
-  '기본 균형형': {
+export const AXIS_PRESET_TEMPLATES: Record<string, CustomAxes> = {
+  '정치·정책형 (보수🔴/진보🔵/중립⚪)': {
+    x_axis: '진보 성향 (-1.0) ↔ 중도/중립 (0.0) ↔ 보수 성향 (+1.0)',
+    y_axis: '낮은 정국 파급력 (-1.0) ↔ 보통 ↔ 높은 사회적 논란/영향 (+1.0)',
+    z_axis: '정치적 공방/의혹 (-1.0) ↔ 중립 ↔ 공인 팩트/실증 근거 (+1.0)',
+    color_axis: '정치 성향 (보수: 빨강 #EF4444, 진보: 파랑 #3B82F6, 중립: 흰색 #F8FAFC)'
+  },
+  '기업·산업형 (실적/호재/악재)': {
+    x_axis: '실적 악재/리스크 (-1.0) ↔ 중립 (0.0) ↔ 성장 모멘텀/호재 (+1.0)',
+    y_axis: '개별 기업 이슈 (-1.0) ↔ 보통 ↔ 산업군/거시경제 파급 (+1.0)',
+    z_axis: '시장 루머/추측 (-1.0) ↔ 중립 ↔ 정량 공시/재무 데이터 (+1.0)',
+    color_axis: '시장 반응 (호재: 에메랄드 #10B981, 악재: 레드 #EF4444, 중립: 블루 #3B82F6)'
+  },
+  '기술·혁신형 (안전/혁신/검증)': {
+    x_axis: '안전성/윤리 우려 (-1.0) ↔ 균형 (0.0) ↔ 기술 혁신/개발 속도 (+1.0)',
+    y_axis: '연구 시제품 (-1.0) ↔ 상용화 ↔ 산업 대격변 파급력 (+1.0)',
+    z_axis: '단순 홍보 마케팅 (-1.0) ↔ 중립 ↔ 학술/실증적 검증 (+1.0)',
+    color_axis: '기술 평가 (혁신/도약: 청록 #10B981, 우려/경고: 다홍 #EF4444, 분석: 블루 #3B82F6)'
+  },
+  '기본 균형형 (규제/진흥)': {
     x_axis: '규제 중심 (-1.0) ↔ 중심 (0.0) ↔ 산업 진흥 (+1.0)',
     y_axis: '낮은 파급력 (-1.0) ↔ 기준 (0.0) ↔ 높은 파급력 (+1.0)',
     z_axis: '낮은 신뢰도 (-1.0) ↔ 중립 (0.0) ↔ 높은 신뢰도 (+1.0)',
     color_axis: '기사 성향 (핵심, 우려, 진흥, 윤리, 건설적)'
   },
-  '정치·정책형': {
-    x_axis: '여당 / 정책 지지 (-1.0) ↔ 중립 ↔ 야당 / 비판 (+1.0)',
-    y_axis: '단기 여론 영향 (-1.0) ↔ 보통 ↔ 법제화 파급력 (+1.0)',
-    z_axis: '정치적 공방 (-1.0) ↔ 중립 ↔ 공인 팩트/실증 (+1.0)',
-    color_axis: '논조 성향 (찬성, 반대, 중립, 심층분석)'
-  },
-  '기술·혁신형': {
-    x_axis: '안전성 / 윤리 검증 (-1.0) ↔ 균형 ↔ 기술 혁신 / 속도 (+1.0)',
-    y_axis: '실험실 시제품 (-1.0) ↔ 상용화 ↔ 산업 패러다임 전환 (+1.0)',
-    z_axis: '단순 마케팅 홍보 (-1.0) ↔ 중립 ↔ 기술/학술적 실증 (+1.0)',
-    color_axis: '기술 평가 (돌파구, 과열, 안정, 관망)'
-  },
-  '경제·시장형': {
-    x_axis: '긴축 / 리스크 우려 (-1.0) ↔ 중립 ↔ 성장 / 투자 호재 (+1.0)',
-    y_axis: '개별 기업 이슈 (-1.0) ↔ 섹터 영향 ↔ 거시경제 파급 (+1.0)',
-    z_axis: '시장 루머/추측 (-1.0) ↔ 중립 ↔ 정량 공시/재무 데이터 (+1.0)',
-    color_axis: '시장 반응 (호재, 악재, 중립, 변동성)'
+  '3차원 공간 전용 (색상 축 없음)': {
+    x_axis: '대립 쟁점 (-1.0) ↔ 중립 (0.0) ↔ 찬성/진흥 (+1.0)',
+    y_axis: '낮은 파급력 (-1.0) ↔ 보통 (0.0) ↔ 높은 파급력 (+1.0)',
+    z_axis: '낮은 신뢰도 (-1.0) ↔ 중립 (0.0) ↔ 높은 신뢰도 (+1.0)',
+    color_axis: ''
   }
+};
+
+/**
+ * Keyword Domain Preset Detector
+ */
+export const detectDomainPreset = (query: string): DomainPresetInfo => {
+  const q = query.toLowerCase().trim();
+
+  // 1. Political keywords
+  const politicsKeywords = [
+    '정치', '대통령', '국회', '총선', '대선', '의원', '여당', '야당', '민주당',
+    '국민의힘', '정당', '보수', '진보', '정부', '개혁', '장관', '법무부', '청와대',
+    '용산', '선거', '공천', '법안', '야권', '여권', '국정감사', '당대표', '청문회',
+    '탄핵', '계엄', '의안', '국회의원', '비대위', '지도부', '지방선거', '특검',
+    '외교', '안보', '남북', '국방', '국무총리', '지지율', '정쟁'
+  ];
+
+  // 2. Corporate / Economy keywords
+  const businessKeywords = [
+    '삼성', '현대', 'sk', 'lg', '카카오', '네이버', '테슬라', '애플', '엔비디아',
+    '구글', '마이크로소프트', '기업', '주가', '실적', '매출', '투자', '코스피',
+    '코스닥', '금리', '환율', '부동산', '경제', '증시', '상장', '배당', '영업이익',
+    '금융', '은행', '증권', '한화', '포스코', '쿠팡', '배민', '현대차', '기아',
+    '하이닉스', '채권', '인플레이션', '소비자물가', 'gdp', '무역', '수출', '재벌',
+    '주총', '어닝', '인수합병', 'm&a', '밸류업'
+  ];
+
+  // 3. Tech / IT keywords
+  const techKeywords = [
+    'ai', '인공지능', '반도체', '로봇', '알고리즘', 'llm', '양자', '우주',
+    '바이오', '소프트웨어', '클라우드', '기술', '특허', '개발', '스타트업',
+    'gpt', '자율주행', '딥러닝', '빅데이터', '드론', '사이버', '스마트폰', '배터리',
+    'hbm', '파운드리', '양자컴퓨터', '신약', '우주선', '누리호'
+  ];
+
+  if (politicsKeywords.some((kw) => q.includes(kw))) {
+    return {
+      domain: 'POLITICS',
+      badgeName: '정치·선거',
+      axes: AXIS_PRESET_TEMPLATES['정치·정책형 (보수🔴/진보🔵/중립⚪)']
+    };
+  }
+
+  if (businessKeywords.some((kw) => q.includes(kw))) {
+    return {
+      domain: 'BUSINESS',
+      badgeName: '기업·경제',
+      axes: AXIS_PRESET_TEMPLATES['기업·산업형 (실적/호재/악재)']
+    };
+  }
+
+  if (techKeywords.some((kw) => q.includes(kw))) {
+    return {
+      domain: 'TECH',
+      badgeName: '기술·IT',
+      axes: AXIS_PRESET_TEMPLATES['기술·혁신형 (안전/혁신/검증)']
+    };
+  }
+
+  return {
+    domain: 'GENERAL',
+    badgeName: '일반·균형',
+    axes: AXIS_PRESET_TEMPLATES['기본 균형형 (규제/진흥)']
+  };
 };
 
 export const App: React.FC = () => {
@@ -69,16 +147,29 @@ export const App: React.FC = () => {
   // Left sidebar collapse / expand state
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(true);
 
-  // Search customization settings modal/popover state
+  // Search customization settings modal state
   const [isCustomSettingsOpen, setIsCustomSettingsOpen] = useState<boolean>(false);
-  const [searchCount, setSearchCount] = useState<number>(15); // Range 1 ~ 100
+  
+  // Default node count set to 30
+  const [searchCount, setSearchCount] = useState<number>(30);
+
+  // Auto domain-adaptive axes state
+  const [isAutoAxesEnabled, setIsAutoAxesEnabled] = useState<boolean>(true);
+
+  // Custom Axes
   const [customAxes, setCustomAxes] = useState<CustomAxes>({
     x_axis: DEMO_DATASETS['AI 기본법'].axes.x_axis,
     y_axis: DEMO_DATASETS['AI 기본법'].axes.y_axis,
     z_axis: DEMO_DATASETS['AI 기본법'].axes.z_axis,
     color_axis: DEMO_DATASETS['AI 기본법'].axes.color_axis
   });
+  // Toggle for 4th dimension (Color axis)
+  const [enableColorAxis, setEnableColorAxis] = useState<boolean>(
+    Boolean(DEMO_DATASETS['AI 기본법'].axes.color_axis && DEMO_DATASETS['AI 기본법'].axes.color_axis.trim())
+  );
+
   const [axisSaveToast, setAxisSaveToast] = useState<string | null>(null);
+  const [searchFeedbackToast, setSearchFeedbackToast] = useState<string | null>(null);
 
   // Grid visibility states
   const [showFloorGrid, setShowFloorGrid] = useState<boolean>(true);
@@ -88,6 +179,15 @@ export const App: React.FC = () => {
   // Camera preset command trigger
   const [cameraPresetCommand, setCameraPresetCommand] = useState<string>('RESET');
   const [activePreset, setActivePreset] = useState<string>('RESET');
+
+  // When search query changes and auto-axes is active, dynamically sync axes to the domain
+  useEffect(() => {
+    if (isAutoAxesEnabled && searchFilter.trim()) {
+      const match = detectDomainPreset(searchFilter);
+      setCustomAxes({ ...match.axes });
+      setEnableColorAxis(Boolean(match.axes.color_axis && match.axes.color_axis.trim()));
+    }
+  }, [searchFilter, isAutoAxesEnabled]);
 
   // Check Groq Key Pool health on mount
   useEffect(() => {
@@ -109,6 +209,7 @@ export const App: React.FC = () => {
     const newDataset = DEMO_DATASETS[key];
     setDataset(newDataset);
     setCustomAxes({ ...newDataset.axes });
+    setEnableColorAxis(Boolean(newDataset.axes.color_axis && newDataset.axes.color_axis.trim()));
     const centerArt = newDataset.articles.find(
       (a) => Math.abs(a.coordinates.x) < 0.05 && Math.abs(a.coordinates.y) < 0.05
     );
@@ -124,15 +225,19 @@ export const App: React.FC = () => {
 
   // Apply custom axes to current dataset view immediately
   const handleApplyAxesToCurrentView = () => {
+    const finalAxes: CustomAxes = {
+      ...customAxes,
+      color_axis: enableColorAxis ? customAxes.color_axis : ''
+    };
     setDataset((prev) => ({
       ...prev,
-      axes: { ...customAxes }
+      axes: finalAxes
     }));
-    setAxisSaveToast('설정한 축 기준이 현재 3D 공간에 즉시 적용되었습니다.');
+    setAxisSaveToast('설정한 축 기준이 3D 공간에 적용되었습니다.');
     setTimeout(() => setAxisSaveToast(null), 3000);
   };
 
-  // Perform real-time Search & 4D Vectorization with custom count and axes
+  // Perform real-time Search & 4D Vectorization
   const handlePerformSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = searchFilter.trim();
@@ -141,6 +246,13 @@ export const App: React.FC = () => {
     setIsSearching(true);
     setIsCustomSettingsOpen(false);
 
+    // If auto-axes is enabled, ensure axes match the query domain
+    let baseAxes = isAutoAxesEnabled ? detectDomainPreset(query).axes : customAxes;
+    const axesToUse: CustomAxes = {
+      ...baseAxes,
+      color_axis: enableColorAxis ? baseAxes.color_axis : ''
+    };
+
     try {
       const res = await fetch('/api/v1/search', {
         method: 'POST',
@@ -148,7 +260,7 @@ export const App: React.FC = () => {
         body: JSON.stringify({
           query,
           display_count: Math.min(100, Math.max(1, searchCount)),
-          custom_axes: customAxes
+          custom_axes: axesToUse
         })
       });
 
@@ -159,17 +271,27 @@ export const App: React.FC = () => {
         const dynamicDataset: DatasetItem = {
           id: `dynamic_${Date.now()}`,
           name: query,
-          axes: data.axes || customAxes,
+          axes: data.axes || axesToUse,
           articles: data.articles
         };
         setDataset(dynamicDataset);
         setCurrentQuery(query);
+        setCustomAxes({ ...dynamicDataset.axes });
+        setEnableColorAxis(Boolean(dynamicDataset.axes.color_axis && dynamicDataset.axes.color_axis.trim()));
         setSelectedArticle(data.articles[0]);
         setCameraPresetCommand('RESET');
         setActivePreset('RESET');
+        setSearchFeedbackToast(null);
+      } else {
+        setSearchFeedbackToast(
+          data.message || `‘${query}’ 관련 실제 언론사 보도 기사를 찾지 못했습니다. 보다 대중적인 키워드로 검색해 보세요.`
+        );
+        setTimeout(() => setSearchFeedbackToast(null), 5000);
       }
     } catch (err) {
       console.error('[Search Error]:', err);
+      setSearchFeedbackToast('뉴스 수집 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      setTimeout(() => setSearchFeedbackToast(null), 4000);
     } finally {
       setIsSearching(false);
     }
@@ -177,7 +299,6 @@ export const App: React.FC = () => {
 
   const filteredArticles = useMemo(() => {
     const query = searchFilter.trim().toLowerCase();
-    // If not actively searching via API, perform in-memory keyword highlight/filter
     if (!query || isSearching) return dataset.articles;
     return dataset.articles.filter(
       (article) =>
@@ -190,6 +311,9 @@ export const App: React.FC = () => {
     if (!selectedArticle) return null;
     return filteredArticles.some((a) => a.id === selectedArticle.id) ? selectedArticle : null;
   }, [filteredArticles, selectedArticle]);
+
+  // Check whether 4D Color axis is actively used in the current dataset
+  const isColorAxisActive = Boolean(dataset.axes.color_axis && dataset.axes.color_axis.trim());
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 select-none font-sans">
@@ -233,12 +357,12 @@ export const App: React.FC = () => {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                상산고등학교 SMARTLAB · 실시간 다차원 뉴스 벡터화 & 3D 시각화 플랫폼
+                상산고등학교 SMARTLAB · 실시간 다차원 뉴스 벡터화 & 3D 공간 시각화 플랫폼
               </p>
             </div>
           </div>
 
-          {/* Search Bar with Customization Trigger and 🔍 Search Button */}
+          {/* Clean Search Bar */}
           <div className="relative flex items-center gap-1.5">
             <form
               onSubmit={handlePerformSearch}
@@ -248,28 +372,29 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsCustomSettingsOpen(!isCustomSettingsOpen)}
-                className={`ml-1 px-2 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
+                className={`ml-1 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
                   isCustomSettingsOpen
                     ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
-                title="검색 조건 커스터마이징 (개수 1~100, X/Y/Z/Color 축 설정)"
+                title="검색 조건 커스터마이징"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-[11px] font-medium hidden sm:inline">
-                  옵션 ({searchCount}개)
+                <span className="text-[11px] font-semibold">
+                  {searchCount}개
                 </span>
               </button>
 
               <div className="w-[1px] h-4 bg-slate-700/80 mx-1" />
 
+              {/* Short & Clean Placeholder as requested */}
               <input
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="검색할 뉴스 키워드 입력 후 🔍 클릭..."
+                placeholder="검색어를 입력하세요"
                 aria-label="뉴스 키워드 검색"
-                className="bg-transparent text-white placeholder-slate-400 px-2 py-1.5 w-48 sm:w-60 focus:outline-none text-xs"
+                className="bg-transparent text-white placeholder-slate-400 px-2.5 py-1.5 w-44 sm:w-56 focus:outline-none text-xs"
               />
 
               {searchFilter && (
@@ -288,7 +413,7 @@ export const App: React.FC = () => {
                 type="submit"
                 disabled={isSearching || !searchFilter.trim()}
                 className="mr-1 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-sm shadow-blue-600/30"
-                title="검색 실행 (1~100개 수집 및 사용자 맞춤 축 4D 벡터화)"
+                title="검색 실행"
               >
                 {isSearching ? (
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
@@ -369,9 +494,24 @@ export const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Search Customization Modal / Dropdown Panel */}
+        {/* Anti-Hallucination Search Feedback Toast */}
+        {searchFeedbackToast && (
+          <div className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 z-50 clean-panel px-4 py-2.5 rounded-xl border border-amber-500/50 bg-slate-900/95 text-amber-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 max-w-lg">
+            <Info className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="leading-snug">{searchFeedbackToast}</span>
+            <button
+              onClick={() => setSearchFeedbackToast(null)}
+              className="ml-auto text-slate-400 hover:text-white p-1"
+              title="닫기"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Search Customization Modal Panel */}
         {isCustomSettingsOpen && (
-          <div className="pointer-events-auto absolute top-20 right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-40 w-96 sm:w-[32rem] max-w-[calc(100vw-2rem)] clean-panel p-5 rounded-2xl border border-blue-500/40 shadow-2xl backdrop-blur-xl space-y-4">
+          <div className="pointer-events-auto absolute top-20 right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-40 w-96 sm:w-[34rem] max-w-[calc(100vw-2rem)] clean-panel p-5 rounded-2xl border border-blue-500/40 shadow-2xl backdrop-blur-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Settings2 className="w-4 h-4 text-blue-400" />
@@ -386,7 +526,7 @@ export const App: React.FC = () => {
               </button>
             </div>
 
-            {/* 1. Article Count Selection (1 ~ 100) */}
+            {/* 1. Article Count Selection (1 ~ 100, default 30) */}
             <div className="space-y-2 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-semibold text-slate-200 flex items-center gap-1.5">
@@ -423,7 +563,7 @@ export const App: React.FC = () => {
 
               {/* Preset Quick Buttons */}
               <div className="flex items-center justify-between gap-1 pt-1">
-                {[5, 15, 30, 50, 100].map((cnt) => (
+                {[10, 20, 30, 50, 100].map((cnt) => (
                   <button
                     key={cnt}
                     type="button"
@@ -434,20 +574,22 @@ export const App: React.FC = () => {
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
-                    {cnt}개
+                    {cnt}개 {cnt === 30 ? '(기본)' : ''}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* 2. Custom Axes Configuration */}
+            {/* 2. Custom Axes Configuration Inputs */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
                   <Compass className="w-3.5 h-3.5 text-indigo-400" />
-                  4D 분석 축 사용자 직접 정의
+                  분석 축 상세 설정
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">X · Y · Z · Color</span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {enableColorAxis ? '4차원 (X·Y·Z·Color)' : '3차원 (X·Y·Z)'}
+                </span>
               </div>
 
               {/* Preset Template Quick Selector */}
@@ -457,10 +599,14 @@ export const App: React.FC = () => {
                   <button
                     key={name}
                     type="button"
-                    onClick={() => setCustomAxes({ ...axes })}
+                    onClick={() => {
+                      setCustomAxes({ ...axes });
+                      setEnableColorAxis(Boolean(axes.color_axis && axes.color_axis.trim()));
+                      setIsAutoAxesEnabled(false);
+                    }}
                     className="shrink-0 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors border border-slate-700/60"
                   >
-                    {name}
+                    {name.split(' ')[0]}
                   </button>
                 ))}
               </div>
@@ -476,8 +622,11 @@ export const App: React.FC = () => {
                   <input
                     type="text"
                     value={customAxes.x_axis}
-                    onChange={(e) => setCustomAxes({ ...customAxes, x_axis: e.target.value })}
-                    placeholder="예: 규제 중심 (-1.0) ↔ 산업 진흥 (+1.0)"
+                    onChange={(e) => {
+                      setCustomAxes({ ...customAxes, x_axis: e.target.value });
+                      setIsAutoAxesEnabled(false);
+                    }}
+                    placeholder="예: 진보 성향 (-1.0) ↔ 중도 (0.0) ↔ 보수 성향 (+1.0)"
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-rose-500/30 text-white focus:outline-none focus:border-rose-400 text-xs"
                   />
                 </div>
@@ -491,8 +640,11 @@ export const App: React.FC = () => {
                   <input
                     type="text"
                     value={customAxes.y_axis}
-                    onChange={(e) => setCustomAxes({ ...customAxes, y_axis: e.target.value })}
-                    placeholder="예: 낮은 파급력 (-1.0) ↔ 높은 파급력 (+1.0)"
+                    onChange={(e) => {
+                      setCustomAxes({ ...customAxes, y_axis: e.target.value });
+                      setIsAutoAxesEnabled(false);
+                    }}
+                    placeholder="예: 낮은 정국 파급력 (-1.0) ↔ 높은 사회적 논란/파급력 (+1.0)"
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/30 text-white focus:outline-none focus:border-emerald-400 text-xs"
                   />
                 </div>
@@ -506,25 +658,58 @@ export const App: React.FC = () => {
                   <input
                     type="text"
                     value={customAxes.z_axis}
-                    onChange={(e) => setCustomAxes({ ...customAxes, z_axis: e.target.value })}
-                    placeholder="예: 낮은 신뢰도 (-1.0) ↔ 높은 신뢰도 (+1.0)"
+                    onChange={(e) => {
+                      setCustomAxes({ ...customAxes, z_axis: e.target.value });
+                      setIsAutoAxesEnabled(false);
+                    }}
+                    placeholder="예: 정치적 의혹/공방 (-1.0) ↔ 공인 팩트/실증 (+1.0)"
                     className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-purple-500/30 text-white focus:outline-none focus:border-purple-400 text-xs"
                   />
                 </div>
 
-                {/* Color Axis */}
-                <div className="space-y-1">
-                  <label className="text-blue-400 font-semibold flex items-center justify-between text-[11px]">
-                    <span>Color축 (노드 색상 / 기사 성향 기준)</span>
-                    <span className="text-[10px] text-slate-400 font-mono">색상 구분</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={customAxes.color_axis}
-                    onChange={(e) => setCustomAxes({ ...customAxes, color_axis: e.target.value })}
-                    placeholder="예: 기사 성향 (긍정 / 중립 / 비판 / 우려)"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-blue-500/30 text-white focus:outline-none focus:border-blue-400 text-xs"
-                  />
+                {/* 4D Color Axis Toggle & Input - Color is used ONLY when 4D axis exists */}
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={enableColorAxis}
+                        onChange={(e) => {
+                          setEnableColorAxis(e.target.checked);
+                          if (!e.target.checked) {
+                            setCustomAxes({ ...customAxes, color_axis: '' });
+                          } else if (!customAxes.color_axis) {
+                            setCustomAxes({
+                              ...customAxes,
+                              color_axis: '기사 성향 (핵심, 우려, 진흥, 윤리, 건설적)'
+                            });
+                          }
+                          setIsAutoAxesEnabled(false);
+                        }}
+                        className="rounded border-slate-700 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="flex items-center gap-1.5 text-blue-400">
+                        <Palette className="w-3.5 h-3.5" />
+                        4차원 (Color) 색상 축 사용
+                      </span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {enableColorAxis ? '4D 활성화' : '3D 기본색 유지'}
+                    </span>
+                  </div>
+
+                  {enableColorAxis && (
+                    <input
+                      type="text"
+                      value={customAxes.color_axis}
+                      onChange={(e) => {
+                        setCustomAxes({ ...customAxes, color_axis: e.target.value });
+                        setIsAutoAxesEnabled(false);
+                      }}
+                      placeholder="예: 정치 성향 (보수: 빨강 #EF4444, 진보: 파랑 #3B82F6, 중립: 흰색 #F8FAFC)"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-blue-500/30 text-white focus:outline-none focus:border-blue-400 text-xs"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -586,11 +771,35 @@ export const App: React.FC = () => {
                 </button>
               </div>
 
+              {/* 4D Political Color Legend Summary - ONLY when 4D Color axis is actively defined */}
+              {isColorAxisActive && dataset.axes.color_axis.includes('보수') && (
+                <div className="clean-panel p-2.5 rounded-xl text-xs space-y-1.5 border border-slate-700/80">
+                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-200">
+                    <span>🏛️ 4차원 정치 성향 색상 지표</span>
+                    <span className="text-[10px] text-slate-400 font-mono">4D Active</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] pt-1">
+                    <span className="flex items-center gap-1 text-blue-400 font-bold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-sm shadow-blue-500/50" />
+                      진보 (-1.0)
+                    </span>
+                    <span className="flex items-center gap-1 text-white font-bold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-white inline-block shadow-sm shadow-white/50" />
+                      중립 (0.0)
+                    </span>
+                    <span className="flex items-center gap-1 text-rose-400 font-bold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shadow-sm shadow-rose-500/50" />
+                      보수 (+1.0)
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* X · Y · Z Coordinate Axes Breakdown */}
               <div className="clean-panel p-3.5 rounded-xl space-y-2.5 text-xs shadow-xl">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-slate-200 tracking-wider flex items-center gap-1.5 text-xs">
-                    <span>📐 X · Y · Z 축 범주 안내</span>
+                    <span>📐 {isColorAxisActive ? 'X · Y · Z · Color 축' : 'X · Y · Z 3차원 축'}</span>
                   </h3>
                   <button
                     onClick={() => setIsCustomSettingsOpen(true)}
@@ -635,6 +844,19 @@ export const App: React.FC = () => {
                       {dataset.axes.z_axis}
                     </p>
                   </div>
+
+                  {/* Color Axis - Only displayed when 4D Color axis exists */}
+                  {isColorAxisActive && (
+                    <div className="p-2.5 rounded-lg bg-slate-900/80 border-l-4 border-blue-500 space-y-1">
+                      <div className="text-blue-400 font-bold flex justify-between items-center text-xs">
+                        <span>Color축 (4차원 성향)</span>
+                        <span className="text-[10px] font-mono text-slate-400">색상 지표</span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-snug font-medium break-words">
+                        {dataset.axes.color_axis}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -743,16 +965,30 @@ export const App: React.FC = () => {
                   <span className="text-[10px] text-slate-400 font-mono">
                     {activeSelectedArticle.pub_date}
                   </span>
-                  <span
-                    className="text-[10px] px-2 py-0.5 rounded font-semibold"
-                    style={{
-                      backgroundColor: `${activeSelectedArticle.coordinates.color_hex}22`,
-                      color: activeSelectedArticle.coordinates.color_hex,
-                      border: `1px solid ${activeSelectedArticle.coordinates.color_hex}44`
-                    }}
-                  >
-                    {activeSelectedArticle.coordinates.color_label}
-                  </span>
+                  
+                  {/* Color badge is ONLY displayed when 4D Color axis is present */}
+                  {isColorAxisActive && (
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded font-semibold"
+                      style={{
+                        backgroundColor:
+                          activeSelectedArticle.coordinates.color_hex === '#F8FAFC'
+                            ? 'rgba(255, 255, 255, 0.15)'
+                            : `${activeSelectedArticle.coordinates.color_hex}22`,
+                        color:
+                          activeSelectedArticle.coordinates.color_hex === '#F8FAFC'
+                            ? '#ffffff'
+                            : activeSelectedArticle.coordinates.color_hex,
+                        border: `1px solid ${
+                          activeSelectedArticle.coordinates.color_hex === '#F8FAFC'
+                            ? 'rgba(255, 255, 255, 0.4)'
+                            : `${activeSelectedArticle.coordinates.color_hex}44`
+                        }`
+                      }}
+                    >
+                      {activeSelectedArticle.coordinates.color_label}
+                    </span>
+                  )}
                 </div>
                 <h2 className="text-xs font-bold text-white mt-1 leading-snug">
                   {activeSelectedArticle.title}
@@ -781,7 +1017,9 @@ export const App: React.FC = () => {
               {/* X Axis Meter */}
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-rose-400 font-bold">X축 ({dataset.axes.x_axis.includes('↔') ? dataset.axes.x_axis.split('↔')[0]?.trim().slice(0, 8) : '가로 쟁점'})</span>
+                  <span className="text-rose-400 font-bold">
+                    X축 ({dataset.axes.x_axis.includes('↔') ? dataset.axes.x_axis.split('↔')[0]?.trim().slice(0, 10) : '가로 쟁점'})
+                  </span>
                   <span className="font-mono font-bold text-rose-400">
                     {activeSelectedArticle.coordinates.x > 0
                       ? `+${activeSelectedArticle.coordinates.x.toFixed(2)}`
@@ -936,7 +1174,7 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-3 text-[11px] font-mono">
             <span className="text-slate-400">
               노드: {filteredArticles.length}
-              {searchFilter.trim() ? ` / ${dataset.articles.length}` : ''}개 로드됨 (설정 수량: {searchCount}개)
+              {searchFilter.trim() ? ` / ${dataset.articles.length}` : ''}개 로드됨 (기본 설정 수량: {searchCount}개)
             </span>
           </div>
         </footer>

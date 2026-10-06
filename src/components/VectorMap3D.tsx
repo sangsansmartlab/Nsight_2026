@@ -300,7 +300,11 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       const isHovered = hoveredArticle?.id === art.id;
 
       const radius = isSelected ? 0.95 : isHovered ? 0.75 : 0.55;
-      const colorHex = isSelected ? '#F59E0B' : art.coordinates.color_hex;
+      
+      // Color is used only when 4D Color axis is explicitly defined
+      const hasColorAxis = Boolean(axes.color_axis && axes.color_axis.trim());
+      const baseNodeColor = hasColorAxis ? (art.coordinates.color_hex || '#38bdf8') : '#38bdf8';
+      const colorHex = isSelected ? '#F59E0B' : baseNodeColor;
 
       const sphereGeo = new THREE.SphereGeometry(radius, 32, 32);
       const sphereMat = new THREE.MeshStandardMaterial({

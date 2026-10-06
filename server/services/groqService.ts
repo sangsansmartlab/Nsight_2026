@@ -89,6 +89,9 @@ export class GroqAnalysisService {
 - Y축 (파급력 및 사회적 영향도): "${axes.y_axis}" (값 범위: -1.0 ~ +1.0)
 - Z축 (정보 신뢰도 및 근거 객관성): "${axes.z_axis}" (값 범위: -1.0 ~ +1.0)
 - Color축 (기사 성향): "${axes.color_axis}"
+※ 색상 규칙 지침:
+- 정치 관련 축일 경우: 보수 성향은 "#EF4444"(빨강), 진보 성향은 "#3B82F6"(파랑), 중립/균형은 "#F8FAFC"(흰색)으로 color_hex를 지정하세요.
+- 기업/경제 관련 축일 경우: 호재는 "#10B981"(에메랄드), 악재/리스크는 "#EF4444"(레드), 중립/전망은 "#3B82F6"(블루)으로 지정하세요.
 
 [분석 대상 기사]
 - 제목: ${article.title}
@@ -250,17 +253,39 @@ export class GroqAnalysisService {
     const y = pseudoNorm(2);
     const z = pseudoNorm(3);
 
+    const isPolitics =
+      axes.color_axis.includes('보수') ||
+      axes.x_axis.includes('보수') ||
+      axes.x_axis.includes('진보') ||
+      axes.color_axis.includes('정치') ||
+      axes.x_axis.includes('정당');
+
     let color_hex = '#3B82F6';
     let color_label = '중립/건설적';
-    if (x > 0.3) {
-      color_hex = '#10B981';
-      color_label = '진흥/긍정';
-    } else if (x < -0.3) {
-      color_hex = '#EF4444';
-      color_label = '규제/우려';
-    } else if (y > 0.5) {
-      color_hex = '#F59E0B';
-      color_label = '핵심/고파급';
+
+    if (isPolitics) {
+      // Politics Domain: Conservative = Red (#EF4444), Progressive = Blue (#3B82F6), Neutral = White (#F8FAFC)
+      if (x > 0.15) {
+        color_hex = '#EF4444';
+        color_label = '보수 성향';
+      } else if (x < -0.15) {
+        color_hex = '#3B82F6';
+        color_label = '진보 성향';
+      } else {
+        color_hex = '#F8FAFC';
+        color_label = '중립/객관';
+      }
+    } else {
+      if (x > 0.3) {
+        color_hex = '#10B981';
+        color_label = '진흥/긍정';
+      } else if (x < -0.3) {
+        color_hex = '#EF4444';
+        color_label = '규제/우려';
+      } else if (y > 0.5) {
+        color_hex = '#F59E0B';
+        color_label = '핵심/고파급';
+      }
     }
 
     return {

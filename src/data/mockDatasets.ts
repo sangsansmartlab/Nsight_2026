@@ -337,5 +337,101 @@ export const DEMO_DATASETS: Record<string, DatasetItem> = {
         origin_link: "https://news.naver.com"
       }
     ]
+  },
+  "정치·정당 지형": {
+    id: "politics-parties",
+    name: "정치·정당 지형",
+    axes: {
+      x_axis: "진보 성향 (-1.0) ↔ 중도/중립 (0.0) ↔ 보수 성향 (+1.0)",
+      y_axis: "낮은 정국 파급력 (-1.0) ↔ 보통 (0.0) ↔ 높은 사회적 논란/파급력 (+1.0)",
+      z_axis: "정치적 의혹/공방 (-1.0) ↔ 중립 (0.0) ↔ 공인 팩트/실증 근거 (+1.0)",
+      color_axis: "정치 성향 (보수: 빨강 #EF4444, 진보: 파랑 #3B82F6, 중립: 흰색 #F8FAFC)"
+    },
+    articles: [
+      {
+        id: "art_pol_center",
+        title: "중앙선관위, 차기 총선 선거구 획정안 및 유권자 지형 분석 보고서 (중립 기준)",
+        publisher: "연합뉴스",
+        pub_date: "2026-10-01",
+        coordinates: {
+          x: 0.0,
+          y: 0.0,
+          z: 0.85,
+          color_hex: "#F8FAFC",
+          color_label: "중립/객관"
+        },
+        summary_3lines: [
+          "중앙선관위 공식 통계 기반 인구 비례 선거구 획정안 발표",
+          "여야 정당 유불리를 배제한 헌법재판소 판결 기준 충족",
+          "정치적 중립 및 객관적 통계에 기초한 절대 기준점"
+        ],
+        keywords: ["선관위", "선거구획정", "중립통계", "기준점"],
+        ai_rationale: "특정 정당 유불리 없이 공인된 팩트 데이터에 근거하여 X축 0.00(중립), Z축 +0.85(공식 팩트), 흰색(#F8FAFC)으로 배치되었습니다.",
+        origin_link: "https://news.naver.com"
+      },
+      {
+        id: "art_pol_cons",
+        title: "여당 지도부, '자유시장 경제 복원 및 건전재정 기조 흔들림 없이 수호'",
+        publisher: "조선일보",
+        pub_date: "2026-10-02",
+        coordinates: {
+          x: 0.78,
+          y: 0.65,
+          z: 0.40,
+          color_hex: "#EF4444",
+          color_label: "보수 성향"
+        },
+        summary_3lines: [
+          "법인세 감세 및 규제 철폐를 통한 민간 주도 성장 드라이브",
+          "국가 채무 비율 통제 및 선심성 포퓰리즘 예산 전액 삭감 방침",
+          "야당의 복지 지출 확대 법안에 대해 재정 파탄 위험 경고"
+        ],
+        keywords: ["건전재정", "자유시장", "규제철폐", "여당"],
+        ai_rationale: "보수 진영의 핵심 가치인 시장 자율과 재정 건전성을 강하게 옹호하여 X축 +0.78, 보수 성향 빨강(#EF4444)으로 산출되었습니다.",
+        origin_link: "https://news.naver.com"
+      },
+      {
+        id: "art_pol_prog",
+        title: "야당 원내대표, '사회 안전망 대폭 확충과 부자감세 철회 집중 추진'",
+        publisher: "한겨레",
+        pub_date: "2026-10-02",
+        coordinates: {
+          x: -0.82,
+          y: 0.70,
+          z: 0.35,
+          color_hex: "#3B82F6",
+          color_label: "진보 성향"
+        },
+        summary_3lines: [
+          "양극화 해소를 위한 초과이익 환수 및 사회보장 지출 증액",
+          "기후 위기 대응 녹색 전환 및 노동 기본권 보장 입법화 촉구",
+          "정부 재정 기조를 '민생 외면 긴축'으로 규정하며 전면 수정 요구"
+        ],
+        keywords: ["사회안전망", "부자감세철회", "노동기본권", "야당"],
+        ai_rationale: "진보 진영의 가치인 소득 재분배 및 공공성 확대를 대변하여 X축 -0.82, 진보 성향 파랑(#3B82F6)으로 산출되었습니다.",
+        origin_link: "https://news.naver.com"
+      },
+      {
+        id: "art_pol_debate",
+        title: "국회 예결위, 내년도 예산안 파행... 여야 '혈세 낭비 vs 민생 외면' 극한 대치",
+        publisher: "경향신문",
+        pub_date: "2026-10-03",
+        coordinates: {
+          x: 0.05,
+          y: 0.90,
+          z: -0.60,
+          color_hex: "#F8FAFC",
+          color_label: "중립/갈등 보도"
+        },
+        summary_3lines: [
+          "정기국회 예산안 심사 첫날부터 고성과 삿대질로 정회 반복",
+          "R&D 및 지역화폐 예산 편성을 둘러싼 여야 원내대표 회동 결렬",
+          "법정 시한 내 처리 불투명에 따른 준예산 편성 우려 대두"
+        ],
+        keywords: ["국회예결위", "예산안대치", "정쟁", "파행"],
+        ai_rationale: "여야 양측의 주장을 동등하게 병렬 보도하여 X축 0.05(중립 흰색 #F8FAFC), 정국 파급력 Y축 +0.90으로 평가되었습니다.",
+        origin_link: "https://news.naver.com"
+      }
+    ]
   }
 };
