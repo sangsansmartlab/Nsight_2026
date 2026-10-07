@@ -11,10 +11,6 @@ import {
   exportArticlesToJSON,
   captureCanvasToPNG
 } from './utils/exportUtils';
-import {
-  buildPortalLinksForArticle,
-  buildPortalLinksForQuery
-} from './utils/newsPortalLinks';
 import { DEMO_DATASETS, DatasetItem } from './data/mockDatasets';
 import {
   Article,
@@ -1583,50 +1579,6 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Direct External News Media Portal Bar for Search Query */}
-                {(() => {
-                  const qLinks = buildPortalLinksForQuery(searchFilter || currentQuery);
-                  return (
-                    <div className="px-3.5 py-2 bg-slate-900/95 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                        <Newspaper className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>
-                          ‘{(searchFilter || currentQuery).trim()}’ 외부 뉴스 매개체 바로 열기:
-                        </span>
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <a
-                          href={qLinks.naver}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>N 네이버 뉴스</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        <a
-                          href={qLinks.google}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>G 구글 뉴스</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        <a
-                          href={qLinks.daum}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>D 다음 뉴스</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 {/* Live Web Search Action Trigger (When user types a search query) */}
                 {searchFilter.trim() && (
                   <div className="px-3.5 py-2.5 bg-gradient-to-r from-blue-950/80 via-slate-900/90 to-indigo-950/80 border-b border-blue-500/30 flex items-center justify-between gap-2 flex-wrap">
@@ -1715,7 +1667,6 @@ export const App: React.FC = () => {
                       const isSel = activeSelectedArticle?.id === article.id;
                       const hasEval = Boolean(evaluations[article.id]);
                       const isNewlyAdded = addedArticleIds.includes(article.id);
-                      const artLinks = buildPortalLinksForArticle(article);
                       return (
                         <div
                           key={article.id}
@@ -1782,13 +1733,14 @@ export const App: React.FC = () => {
                                 <span>인앱 리더</span>
                               </button>
                               <a
-                                href={artLinks.naver}
+                                href={article.origin_link}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-2 py-0.5 rounded bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-bold text-[10px]"
-                                title="네이버 뉴스에서 이 기사 검색 결과 열기"
+                                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-[10px] flex items-center gap-1 transition-colors"
+                                title="스크래핑 언론사 원문 기사 바로보기"
                               >
-                                N뉴스
+                                <span>원문</span>
+                                <ExternalLink className="w-2.5 h-2.5 text-blue-400" />
                               </a>
                             </div>
                             <div className="font-mono tabular-nums text-[10px] text-slate-400">
@@ -2736,77 +2688,40 @@ export const App: React.FC = () => {
                 </div>
               )}
 
-              {/* In-App Smart Reader & External News Media Portal Hub (Naver / Google / Daum / Publisher) */}
-              {(() => {
-                const portalLinks = buildPortalLinksForArticle(activeSelectedArticle);
-                return (
-                  <div className="space-y-2 pt-1 border-t border-slate-800/80">
-                    <div className="flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setIsReaderModalOpen(true)}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold text-center transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
-                      >
-                        <BookOpen className="w-4 h-4" />
-                        <span>인앱 뉴스 리더 & 연관뉴스 띄우기</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleShareArticle(activeSelectedArticle)}
-                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0"
-                        title="기사 요약 및 좌표 복사"
-                      >
-                        <Share2 className="w-3.5 h-3.5 text-blue-400" />
-                      </button>
-                    </div>
+              {/* In-App Smart Reader & Direct Original Article Link */}
+              <div className="space-y-2 pt-1 border-t border-slate-800/80">
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsReaderModalOpen(true)}
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold text-center transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span>인앱 뉴스 리더 & 연관뉴스 띄우기</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleShareArticle(activeSelectedArticle)}
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0"
+                    title="기사 요약 및 좌표 복사"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-blue-400" />
+                  </button>
+                </div>
 
-                    <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
-                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                        <Newspaper className="w-3 h-3 text-emerald-400" />
-                        외부 뉴스 매개체로 바로 이동:
-                      </span>
-                      <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                        <a
-                          href={portalLinks.naver}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span>N 네이버 뉴스</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={portalLinks.google}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-300 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span>G 구글 뉴스</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={portalLinks.daum}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-indigo-300 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span>D 다음 뉴스</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={portalLinks.original}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span className="truncate">{activeSelectedArticle.publisher} 원문</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                      </div>
-                    </div>
+                <a
+                  href={activeSelectedArticle.origin_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-100 font-bold text-xs flex items-center justify-between transition-colors shadow-sm"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span className="truncate">{activeSelectedArticle.publisher} 원문 기사 바로보기</span>
                   </div>
-                );
-              })()}
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+              </div>
 
               {/* Inline Personal Article Evaluation & 1st/2nd/3rd Axis Calibration Card */}
               <div className="bg-slate-900/95 p-3 rounded-xl border border-cyan-500/30 space-y-2.5 text-xs">
