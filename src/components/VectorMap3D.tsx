@@ -559,7 +559,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       const isEvaluated = evaluatedSet.has(art.id);
       const isNewlyAdded = addedSet.has(art.id);
 
-      const radius = isSelected ? 0.98 : isHovered ? 0.8 : isTopMatched || isNewlyAdded ? 0.72 : 0.56;
+      const radius = isSelected ? 0.66 : isHovered ? 0.62 : isTopMatched || isNewlyAdded ? 0.59 : 0.54;
 
       const continuousInfo = getContinuousColor(art.coordinates.x, isPol);
       const baseNodeColor = hasColorAxis ? continuousInfo.hex : '#38bdf8';
@@ -571,7 +571,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
         roughness: 0.22,
         metalness: 0.78,
         emissive: new THREE.Color(colorHex),
-        emissiveIntensity: isSelected ? 0.88 : isHovered ? 0.5 : isTopMatched || isNewlyAdded ? 0.35 : 0.16
+        emissiveIntensity: isSelected ? 0.85 : isHovered ? 0.5 : isTopMatched || isNewlyAdded ? 0.35 : 0.16
       });
 
       const mesh = new THREE.Mesh(sphereGeo, sphereMat);
@@ -583,7 +583,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
 
       // Highlight Halo Ring for Selected, #1 Top-Matched, Newly Added, or User-Evaluated Node
       if (isSelected || isTopMatched || isNewlyAdded || isEvaluated) {
-        const ringGeo = new THREE.RingGeometry(radius + 0.22, radius + 0.36, 32);
+        const ringGeo = new THREE.RingGeometry(radius + 0.12, radius + 0.2, 32);
         const ringMat = new THREE.MeshBasicMaterial({
           color: isSelected
             ? 0xf59e0b
@@ -642,7 +642,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       // 1. X Tube (1순위 축)
       if (Math.abs(cx) > 0.01) {
         const xCurve = new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(cx, 0, 0));
-        const xTubeGeom = new THREE.TubeGeometry(xCurve, 24, 0.16, 8, false);
+        const xTubeGeom = new THREE.TubeGeometry(xCurve, 24, 0.12, 8, false);
         const xTubeMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
         contentGroup.add(new THREE.Mesh(xTubeGeom, xTubeMat));
       }
@@ -650,7 +650,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       // 2. Y Tube (2순위 축)
       if (Math.abs(cy) > 0.01) {
         const yCurve = new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, cy, 0));
-        const yTubeGeom = new THREE.TubeGeometry(yCurve, 24, 0.16, 8, false);
+        const yTubeGeom = new THREE.TubeGeometry(yCurve, 24, 0.12, 8, false);
         const yTubeMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
         contentGroup.add(new THREE.Mesh(yTubeGeom, yTubeMat));
       }
@@ -658,7 +658,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       // 3. Z Tube (3순위 축)
       if (Math.abs(cz) > 0.01) {
         const zCurve = new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, cz));
-        const zTubeGeom = new THREE.TubeGeometry(zCurve, 24, 0.16, 8, false);
+        const zTubeGeom = new THREE.TubeGeometry(zCurve, 24, 0.12, 8, false);
         const zTubeMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
         contentGroup.add(new THREE.Mesh(zTubeGeom, zTubeMat));
       }
@@ -685,7 +685,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       contentGroup.add(projLine);
 
       // Colored marker dots on each axis
-      const dotGeo = new THREE.SphereGeometry(0.38, 16, 16);
+      const dotGeo = new THREE.SphereGeometry(0.3, 16, 16);
 
       const dotX = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: 0xf43f5e }));
       dotX.position.set(cx, 0, 0);
