@@ -407,6 +407,37 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </button>
           </form>
 
+          {/* Direct External News Media Portal Bar on Landing View */}
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+            <span className="text-[11px] text-slate-400">
+              ‘{(searchFilter || 'AI 기본법').trim()}’ 외부 뉴스 매개체 바로가기:
+            </span>
+            <a
+              href={`https://search.naver.com/search.naver?where=news&sm=tab_jum&query=${encodeURIComponent((searchFilter || 'AI 기본법').trim())}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 font-bold text-[11px] transition-colors"
+            >
+              N 네이버 뉴스
+            </a>
+            <a
+              href={`https://news.google.com/search?q=${encodeURIComponent((searchFilter || 'AI 기본법').trim())}&hl=ko&gl=KR&ceid=KR%3Ako`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-300 font-bold text-[11px] transition-colors"
+            >
+              G 구글 뉴스
+            </a>
+            <a
+              href={`https://search.daum.net/search?w=news&q=${encodeURIComponent((searchFilter || 'AI 기본법').trim())}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-indigo-300 font-bold text-[11px] transition-colors"
+            >
+              D 다음 뉴스
+            </a>
+          </div>
+
           {/* Quick Trending Keyword Discovery Buttons */}
           <div className="flex items-center gap-1.5 flex-wrap justify-center pt-0.5 text-xs">
             <span className="text-slate-400 text-[11px] mr-1 flex items-center gap-1">

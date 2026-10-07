@@ -149,3 +149,107 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message || 'Search execution failed' });
   }
 });
+
+/**
+ * In-App Smart Reader Preview & Related Portal News Endpoint
+ * Bypasses X-Frame-Options restrictions and provides direct Naver/Google/Daum/Publisher links
+ */
+apiRouter.post('/article-preview', async (req: Request, res: Response) => {
+  try {
+    const {
+      title,
+      publisher,
+      origin_link,
+      pub_date,
+      summary_3lines,
+      keywords,
+      ai_rationale
+    } = req.body;
+
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({ error: 'title is required' });
+    }
+
+    const preview = await newsCrawlerService.getArticlePreviewAndRelated({
+      title,
+      publisher: publisher || '언론사',
+      origin_link: origin_link || '',
+      pub_date,
+      summary_3lines,
+      keywords,
+      ai_rationale
+    });
+
+    res.json({
+      status: 'success',
+      preview
+    });
+  } catch (error: any) {
+    console.error('[API /article-preview Error]:', error);
+    res.status(500).json({ error: error.message || 'Article preview failed' });
+  }
+});
+
+/**
+ * Single Found Article 4D Vectorization & Addition Endpoint
+ * Analyzes a single article (from related news, external URL, or title/snippet)
+ * against the user's active 1st/2nd/3rd priority axes so it can be added to the 3D space.
+ */
+apiRouter.post('/add-article', async (req: Request, res: Response) => {
+  try {
+    const {
+      url,
+      title,
+      publisher,
+      pub_date,
+      snippet,
+      custom_axes,
+      ranked_axes
+    } = req.body;
+
+    if (!url && !title) {
+      return res.status(400).json({ error: 'Either url or title is required' });
+    }
+
+    const axes: CustomAxesInput = custom_axes || {
+      x_axis: '규제 중심 vs 산업 진흥',
+      y_axis: '사회적 파급력 & 영향도',
+      z_axis: '정보 신뢰도 & 객관성',
+      color_axis: '기사 성향 (긍정 / 중립 / 비판)'
+    };
+
+    const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
+      ? ranked_axes
+      : undefined;
+
+    const candidate = await newsCrawlerService.extractOrFindSingleArticle({
+      url,
+      title,
+      publisher,
+      pub_date,
+      snippet
+    });
+
+    const analyzedList = await groqAnalysisService.analyzeBatch(
+      [candidate],
+      axes,
+      1,
+      undefined,
+      rankedAxes
+    );
+
+    if (!analyzedList || analyzedList.length === 0) {
+      return res.status(500).json({ error: 'Failed to analyze article coordinates' });
+    }
+
+    res.json({
+      status: 'success',
+      article: analyzedList[0]
+    });
+  } catch (error: any) {
+    console.error('[API /add-article Error]:', error);
+    res.status(500).json({ error: error.message || 'Failed to add article to 3D space' });
+  }
+});
+
+

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Article, CustomAxes, RankedAxisItem } from '../types';
+import { Article, CustomAxes, RankedAxisItem, PersonalAnchorVector } from '../types';
 import { getContinuousColor, isPoliticsDomain } from '../utils/colorScale';
 
 interface VectorMap3DProps {
@@ -11,6 +11,9 @@ interface VectorMap3DProps {
   selectedArticle: Article | null;
   hoveredArticle: Article | null;
   topMatchedArticleId?: string | null;
+  personalAnchor?: PersonalAnchorVector | null;
+  evaluatedArticleIds?: string[];
+  addedArticleIds?: string[];
   scaleFactor: number;
   showFloorGrid: boolean;
   showXYGrid: boolean;
@@ -73,6 +76,9 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
   selectedArticle,
   hoveredArticle,
   topMatchedArticleId,
+  personalAnchor,
+  evaluatedArticleIds = [],
+  addedArticleIds = [],
   scaleFactor,
   showFloorGrid,
   showXYGrid,
@@ -505,8 +511,41 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
     originMarker.position.set(0, 0, 0);
     contentGroup.add(originMarker);
 
+    // Personal Ideal Anchor Marker (when user has evaluated articles)
+    if (personalAnchor && personalAnchor.evaluationCount > 0) {
+      const ax = personalAnchor.x * scaleFactor;
+      const ay = personalAnchor.y * scaleFactor;
+      const az = personalAnchor.z * scaleFactor;
+
+      const anchorGeo = new THREE.OctahedronGeometry(0.62, 0);
+      const anchorMat = new THREE.MeshBasicMaterial({
+        color: 0x06b6d4,
+        wireframe: true
+      });
+      const anchorMesh = new THREE.Mesh(anchorGeo, anchorMat);
+      anchorMesh.position.set(ax, ay, az);
+      contentGroup.add(anchorMesh);
+
+      const anchorLineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(ax, ay, az)
+      ]);
+      const anchorLineMat = new THREE.LineDashedMaterial({
+        color: 0x06b6d4,
+        dashSize: 0.4,
+        gapSize: 0.2,
+        transparent: true,
+        opacity: 0.85
+      });
+      const anchorLine = new THREE.Line(anchorLineGeo, anchorLineMat);
+      anchorLine.computeLineDistances();
+      contentGroup.add(anchorLine);
+    }
+
     const hasColorAxis = Boolean(axes.color_axis && axes.color_axis.trim());
     const isPol = isPoliticsDomain(axes.color_axis, axes.x_axis);
+    const evaluatedSet = new Set(evaluatedArticleIds);
+    const addedSet = new Set(addedArticleIds);
 
     // Render Article Nodes & Clean 3D Coordinate Vectors
     articles.forEach((art) => {
@@ -517,8 +556,10 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       const isSelected = selectedArticle?.id === art.id;
       const isHovered = hoveredArticle?.id === art.id;
       const isTopMatched = topMatchedArticleId === art.id;
+      const isEvaluated = evaluatedSet.has(art.id);
+      const isNewlyAdded = addedSet.has(art.id);
 
-      const radius = isSelected ? 0.98 : isHovered ? 0.8 : isTopMatched ? 0.72 : 0.56;
+      const radius = isSelected ? 0.98 : isHovered ? 0.8 : isTopMatched || isNewlyAdded ? 0.72 : 0.56;
 
       const continuousInfo = getContinuousColor(art.coordinates.x, isPol);
       const baseNodeColor = hasColorAxis ? continuousInfo.hex : '#38bdf8';
@@ -530,7 +571,7 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
         roughness: 0.22,
         metalness: 0.78,
         emissive: new THREE.Color(colorHex),
-        emissiveIntensity: isSelected ? 0.88 : isHovered ? 0.5 : isTopMatched ? 0.35 : 0.16
+        emissiveIntensity: isSelected ? 0.88 : isHovered ? 0.5 : isTopMatched || isNewlyAdded ? 0.35 : 0.16
       });
 
       const mesh = new THREE.Mesh(sphereGeo, sphereMat);
@@ -540,14 +581,20 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
       contentGroup.add(mesh);
       nodesListRef.current.push(mesh);
 
-      // Highlight Halo Ring for Selected or #1 Top-Matched Node
-      if (isSelected || isTopMatched) {
+      // Highlight Halo Ring for Selected, #1 Top-Matched, Newly Added, or User-Evaluated Node
+      if (isSelected || isTopMatched || isNewlyAdded || isEvaluated) {
         const ringGeo = new THREE.RingGeometry(radius + 0.22, radius + 0.36, 32);
         const ringMat = new THREE.MeshBasicMaterial({
-          color: isSelected ? 0xf59e0b : 0x38bdf8,
+          color: isSelected
+            ? 0xf59e0b
+            : isNewlyAdded
+            ? 0x06b6d4
+            : isTopMatched
+            ? 0x38bdf8
+            : 0x10b981,
           side: THREE.DoubleSide,
           transparent: true,
-          opacity: isSelected ? 0.9 : 0.65
+          opacity: isSelected ? 0.9 : isNewlyAdded ? 0.85 : isTopMatched ? 0.65 : 0.7
         });
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
         ringMesh.position.set(px, py, pz);
@@ -656,6 +703,9 @@ export const VectorMap3D: React.FC<VectorMap3DProps> = ({
     articles,
     axes,
     rankedAxes,
+    personalAnchor,
+    evaluatedArticleIds,
+    addedArticleIds,
     scaleFactor,
     selectedArticle,
     hoveredArticle,

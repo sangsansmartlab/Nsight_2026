@@ -34,7 +34,7 @@ export interface RankedAxisItem {
   negativeLabel: string; // e.g., "손실/비용 부담 (-)"
   positiveLabel: string; // e.g., "고수익/가치 창출 (+)"
   preferredDirection: 1 | 0 | -1; // 1: 양(+) 선호, 0: 균형/무관, -1: 음(-) 선호
-  weight: number; // 사용자 설정 가중치 (예: 50, 30, 20)
+  weight: number; // 사용자 설정 또는 평가 학습 가중치 (예: 50, 30, 20)
 }
 
 export interface UserPreferenceProfile {
@@ -51,6 +51,55 @@ export interface ScoredArticle {
   axis1Score: number;
   axis2Score: number;
   axis3Score: number;
+}
+
+export interface ArticleEvaluation {
+  articleId: string;
+  title: string;
+  preference: 1 | 0 | -1; // +1: 높은 공감/유익, 0: 중립/참고, -1: 비공감/거리감
+  calibratedCoords: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  originalCoords: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  updatedAt: string;
+}
+
+export interface PersonalAnchorVector {
+  x: number;
+  y: number;
+  z: number;
+  evaluationCount: number;
+}
+
+export interface RelatedPortalArticle {
+  title: string;
+  publisher: string;
+  pub_date: string;
+  link: string;
+  naverLink: string;
+  googleLink: string;
+  daumLink: string;
+}
+
+export interface ArticlePreviewContent {
+  title: string;
+  publisher: string;
+  pub_date: string;
+  paragraphs: string[];
+  relatedArticles: RelatedPortalArticle[];
+  portalLinks: {
+    naver: string;
+    google: string;
+    daum: string;
+    original: string;
+    isSimulatedUrl: boolean;
+  };
 }
 
 export interface SearchRequest {
