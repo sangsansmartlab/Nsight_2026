@@ -150,23 +150,30 @@ export class GroqAnalysisService {
 }
 `;
 
-          const response = await groq.chat.completions.create({
-            model: modelToUse,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are an expert news intelligence vectorizer. You must strictly output valid JSON.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.2,
-            max_completion_tokens: 900
-          });
+          const callWithTimeout = Promise.race([
+            groq.chat.completions.create({
+              model: modelToUse,
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    'You are an expert news intelligence vectorizer. You must strictly output valid JSON.'
+                },
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              response_format: { type: 'json_object' },
+              temperature: 0.2,
+              max_completion_tokens: 900
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`Groq API timeout after 7000ms on ${modelToUse}`)), 7000)
+            )
+          ]);
+
+          const response = await callWithTimeout;
 
           const rawContent = response.choices[0]?.message?.content;
           if (!rawContent) {

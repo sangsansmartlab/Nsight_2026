@@ -1646,6 +1646,40 @@ export const App: React.FC = () => {
                   );
                 })()}
 
+                {/* Live Web Search Action Trigger (When user types a search query) */}
+                {searchFilter.trim() && (
+                  <div className="px-3.5 py-2.5 bg-gradient-to-r from-blue-950/80 via-slate-900/90 to-indigo-950/80 border-b border-blue-500/30 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-300 min-w-0">
+                      <Sparkles className="w-4 h-4 text-blue-400 shrink-0 animate-pulse" />
+                      <span className="truncate">
+                        ‘<strong className="text-white">{searchFilter}</strong>’ 실시간 웹 뉴스 수집 & Groq 4D 분석
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isSearching}
+                        onClick={() => handlePerformSearch(undefined, searchFilter, false)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-[11px] inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                        title="입력한 키워드로 웹 전체 실시간 뉴스 수집 및 4D 벡터화 (Enter)"
+                      >
+                        {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                        <span>새 3D 공간 탐색 (Enter)</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSearching}
+                        onClick={() => handlePerformSearch(undefined, searchFilter, true)}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-700/80 hover:bg-cyan-600 text-cyan-100 font-bold text-[11px] inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                        title="현재 3D 좌표 공간에 검색된 기사를 새로운 점으로 추가"
+                      >
+                        <PlusCircle className="w-3 h-3 text-cyan-300" />
+                        <span>+ 현재 좌표에 추가</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Quick #Keyword Filter Bar */}
                 {availableKeywords.length > 0 && (
                   <div className="px-3.5 py-2 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
