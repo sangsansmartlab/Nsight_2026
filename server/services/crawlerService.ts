@@ -152,14 +152,13 @@ export class NewsCrawlerService {
   }
 
   /**
-   * Search news using Daum News DOM scraper with multiple CSS fallback selectors
+   * Search news using Daum News DOM scraper with multiple CSS fallback selectors (Parallel page fetching)
    */
   public async searchWithDomParser(query: string, count: number): Promise<CrawledArticle[]> {
     const encoded = encodeURIComponent(query);
-    const results: CrawledArticle[] = [];
-    const maxPages = Math.min(5, Math.max(1, Math.ceil(count / 10)));
+    const maxPages = Math.min(4, Math.max(1, Math.ceil(count / 10)));
 
-    for (let page = 1; page <= maxPages && results.length < count * 2; page++) {
+    const fetchPage = async (page: number): Promise<CrawledArticle[]> => {
       try {
         const url = `https://search.daum.net/search?w=news&q=${encoded}&sort=accuracy&p=${page}`;
         const response = await axios.get(url, {
@@ -167,16 +166,14 @@ export class NewsCrawlerService {
             'User-Agent': this.userAgent,
             'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
           },
-          timeout: 6000
+          timeout: 4500
         });
 
         const $ = cheerio.load(response.data);
         const items = $('div.c-item-doc, ul.c-list-basic > li, .c-item-doc, div.item-title');
-        if (items.length === 0) break;
+        const pageArticles: CrawledArticle[] = [];
 
         items.each((idx, el) => {
-          if (results.length >= count * 2) return false;
-
           const $el = $(el);
           const titleLink = $el
             .find('.item-title a, strong.tit-g a, a.tit_main, a.tit_g, a.link_txt, a[href*="v.daum.net"]')
@@ -203,8 +200,8 @@ export class NewsCrawlerService {
           if (relevance <= 0.0) return;
 
           if (title && link) {
-            results.push({
-              id: `daum_${Date.now()}_${idx + 1}`,
+            pageArticles.push({
+              id: `daum_${Date.now()}_p${page}_${idx + 1}`,
               title,
               publisher: publisher || '언론사',
               origin_link: link,
@@ -214,10 +211,17 @@ export class NewsCrawlerService {
             });
           }
         });
-      } catch (pageErr) {
-        break;
+
+        return pageArticles;
+      } catch {
+        return [];
       }
-    }
+    };
+
+    // Parallel page requests
+    const pagePromises = Array.from({ length: maxPages }, (_, i) => fetchPage(i + 1));
+    const allPageResults = await Promise.all(pagePromises);
+    const results = allPageResults.flat();
 
     return results;
   }

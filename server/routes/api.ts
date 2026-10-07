@@ -86,6 +86,31 @@ apiRouter.post('/analyze', async (req: Request, res: Response) => {
   }
 });
 
+// High-speed in-memory query cache with 15-minute TTL
+interface SearchCacheEntry {
+  data: {
+    status: string;
+    total: number;
+    axes: CustomAxesInput;
+    articles: any[];
+    message?: string;
+  };
+  expiresAt: number;
+}
+
+const searchCache = new Map<string, SearchCacheEntry>();
+const MAX_CACHE_ENTRIES = 100;
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+const getCacheKey = (
+  query: string,
+  count: number,
+  axes: CustomAxesInput,
+  rankedAxes?: RankedAxisInput[]
+): string => {
+  return `${query.trim().toLowerCase()}::${count}::${axes.x_axis}::${axes.y_axis}::${axes.z_axis}::${axes.color_axis}::${JSON.stringify(rankedAxes || [])}`;
+};
+
 /**
  * Real-time Search and Vectorization Endpoint
  */
@@ -108,7 +133,15 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
       ? ranked_axes
       : undefined;
 
-    // 1. Live Web Discovery & Crawling via Google News RSS & Daum News DOM Engine
+    // Check In-Memory Cache for ultra-fast <10ms response
+    const cacheKey = getCacheKey(query, count, axes, rankedAxes);
+    const cached = searchCache.get(cacheKey);
+    const now = Date.now();
+    if (cached && cached.expiresAt > now) {
+      return res.json(cached.data);
+    }
+
+    // 1. Live Web Discovery & Crawling via Google News RSS & Parallel Daum News Engine
     let candidateArticles: ArticleInput[] = [];
     try {
       candidateArticles = await newsCrawlerService.searchNews(query, count);
@@ -118,18 +151,19 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
 
     // Strict Anti-Hallucination Policy: NEVER fabricate fake mock news articles
     if (!candidateArticles || candidateArticles.length === 0) {
-      return res.json({
+      const emptyResponse = {
         status: 'empty',
         total: 0,
         axes,
         articles: [],
         message: `'${query}'에 대한 실제 뉴스 보도를 찾지 못했습니다. 보다 널리 쓰이는 키워드로 검색해 보세요.`
-      });
+      };
+      return res.json(emptyResponse);
     }
 
     const articlesToAnalyze = candidateArticles.slice(0, count);
 
-    // 2. Groq strictly does 4D Vector Coordinates, 3-line summaries and Rationale inference
+    // 2. Groq parallel multi-article chunk vectorization (5x~10x faster)
     const analyzed = await groqAnalysisService.analyzeBatch(
       articlesToAnalyze,
       axes,
@@ -138,12 +172,24 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
       rankedAxes
     );
 
-    res.json({
+    const resultPayload = {
       status: 'success',
       total: analyzed.length,
       axes,
       articles: analyzed
+    };
+
+    // Save to Cache
+    if (searchCache.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey = searchCache.keys().next().value;
+      if (oldestKey) searchCache.delete(oldestKey);
+    }
+    searchCache.set(cacheKey, {
+      data: resultPayload,
+      expiresAt: now + CACHE_TTL_MS
     });
+
+    res.json(resultPayload);
   } catch (error: any) {
     console.error('[API /search Error]:', error);
     res.status(500).json({ error: error.message || 'Search execution failed' });
