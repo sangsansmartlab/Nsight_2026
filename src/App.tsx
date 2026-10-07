@@ -1320,25 +1320,6 @@ export const App: React.FC = () => {
                   </p>
                 </div>
               </button>
-
-              {/* Demo Issue Quick Switcher */}
-              <div className="hidden lg:flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 ml-2">
-                <span className="text-[10px] text-slate-400 px-1.5 font-medium">이슈:</span>
-                {Object.keys(DEMO_DATASETS).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleSelectDataset(key)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors whitespace-nowrap ${
-                      currentQuery === key
-                        ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 font-bold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    }`}
-                  >
-                    {key}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Camera View Presets */}

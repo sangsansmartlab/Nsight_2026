@@ -187,20 +187,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
 
-  const trendingKeywords = [
-    'AI 기본법',
-    '반도체 HBM',
-    '국회 정책',
-    '삼성전자 실적',
-    '미국 기준금리',
-    '의대 증원'
-  ];
-
-  const handleChipClick = (kw: string) => {
-    setSearchFilter(kw);
-    onSearch(undefined, kw);
-  };
-
   const rankBadgeStyles = [
     {
       axisCode: '1순위 (X축)',
@@ -436,24 +422,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
             >
               D 다음 뉴스
             </a>
-          </div>
-
-          {/* Quick Trending Keyword Discovery Buttons */}
-          <div className="flex items-center gap-1.5 flex-wrap justify-center pt-0.5 text-xs">
-            <span className="text-slate-400 text-[11px] mr-1 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-blue-400" />
-              빠른 실시간 탐색:
-            </span>
-            {trendingKeywords.map((kw) => (
-              <button
-                key={kw}
-                type="button"
-                onClick={() => handleChipClick(kw)}
-                className="px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-blue-500/40 transition-all text-xs font-medium whitespace-nowrap"
-              >
-                {kw}
-              </button>
-            ))}
           </div>
 
           {/* Integrated 1st/2nd/3rd Priority Axes, Custom Weights & Personal Tendency Settings Panel */}
