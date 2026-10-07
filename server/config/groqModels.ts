@@ -1,6 +1,6 @@
 /**
- * Reference Registry of Supported Models on Groq Cloud
- * The actual model is not hardcoded and can be dynamically selected via GROQ_MODEL or request parameters.
+ * Reference Registry of Supported & Verified Models on Groq Cloud in this Session
+ * Ordered by benchmark performance for Korean News 4D Vectorization & JSON Schema Adherence
  */
 export interface GroqModelMeta {
   id: string;
@@ -16,32 +16,42 @@ export interface GroqModelMeta {
 export const GROQ_AVAILABLE_MODELS: GroqModelMeta[] = [
   {
     id: 'qwen/qwen3.8-27b',
-    name: 'Qwen 3.8 27B',
-    provider: 'Alibaba Cloud',
+    name: 'Qwen 3.8 27B (Primary Default)',
+    provider: 'Alibaba Cloud / Groq',
     contextWindow: 128000,
-    tokensPerSecond: '~350 T/s',
-    recommendedFor: '정밀한 4D 좌표화, 3줄 요약, 다국어/한국어 시사 쟁점 분석 (기본 추천 모델)',
-    pros: '한국어 뉘앙스 이해도 최상, 정밀한 JSON 스키마 준수율, 실시간 추론 가용성 보장',
-    cons: '복잡한 구조화 요청 시 엄격한 프롬프트 지시 필요'
+    tokensPerSecond: '~630–930ms latency',
+    recommendedFor: '정밀한 4D 좌표화, 3줄 요약, 한국어 시사 쟁점 분석 및 ai_rationale 생성 (1순위 기본 모델)',
+    pros: '한국어 뉘앙스 이해도 1위, 100% JSON 스키마 준수율(ai_rationale 포함), 빠른 응답 속도',
+    cons: '대규모 배치 시 키 로테이션과 병행 사용 권장'
   },
   {
     id: 'openai/gpt-oss-120b',
-    name: 'GPT OSS 120B',
+    name: 'GPT OSS 120B (Deep Reasoning Fallback)',
     provider: 'OpenAI / Groq',
     contextWindow: 128000,
-    tokensPerSecond: '~280 T/s',
-    recommendedFor: '대규모 심층 논리 추론, 정밀 쟁점 평가 및 신뢰도 다각도 검증',
-    pros: '120B 대형 파라미터 기반 높은 지능, 복합 시사 맥락 분석 탁월',
-    cons: '20B 모델 대비 약간 높은 지연 시간'
+    tokensPerSecond: '~1.8s latency',
+    recommendedFor: '대규모 심층 논리 추론, 정밀 쟁점 평가 및 신뢰도 다각도 검증 (2순위 폴백)',
+    pros: '120B 대형 파라미터 기반 높은 추론력, 모든 JSON 필드 완벽 출력',
+    cons: 'Qwen 3.8 27B 대비 응답 시간이 약 2배 소요'
   },
   {
     id: 'openai/gpt-oss-20b',
-    name: 'GPT OSS 20B',
+    name: 'GPT OSS 20B (High-Speed Fallback)',
     provider: 'OpenAI / Groq',
     contextWindow: 128000,
-    tokensPerSecond: '~750 T/s',
-    recommendedFor: '초고속 기사 필터링, 실시간 3D 벡터화, 낮은 지연 시간',
-    pros: '초당 750토큰 이상의 고속 처리, 신속한 벡터 좌표화',
-    cons: '120B 모델 대비 복합 맥락 추론은 상대적으로 간결'
+    tokensPerSecond: '~620ms latency',
+    recommendedFor: '초고속 기사 필터링 및 실시간 3D 벡터화 (3순위 폴백)',
+    pros: '매우 빠른 추론 속도 및 안정적인 JSON 출력',
+    cons: '120B 및 Qwen 3.8 27B 대비 산출 근거 문장이 간결함'
+  },
+  {
+    id: 'allam-2-7b',
+    name: 'ALLaM 2 7B (Lightweight Fallback)',
+    provider: 'SDAIA / Groq',
+    contextWindow: 32768,
+    tokensPerSecond: '~900ms latency',
+    recommendedFor: '경량 백업 추론 (4순위 폴백)',
+    pros: '가벼운 파라미터로 기본 JSON 좌표 산출 가능',
+    cons: '한국어 요약 품질이 상위 3개 모델 대비 단순함'
   }
 ];

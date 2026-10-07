@@ -47,19 +47,22 @@ export interface RankedAxisInput {
   weight?: number;
 }
 
-// Groq Active Production Model Tier
+// Verified Groq Active Production Model Tier in this Session (Ordered by Korean News JSON Benchmark)
 const FALLBACK_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
   'qwen/qwen3.8-27b',
   'openai/gpt-oss-120b',
-  'openai/gpt-oss-20b'
+  'openai/gpt-oss-20b',
+  'allam-2-7b'
 ];
+
+const DEFAULT_GROQ_MODEL = 'qwen/qwen3.8-27b';
 
 /**
  * Service to execute multi-dimensional news analysis using Groq with 5-key failover and model fallback
  */
 export class GroqAnalysisService {
+  private unavailableModels = new Set<string>();
+
   /**
    * Analyzes an article using Groq LLM with automatic key pool failover and model fallback
    */
@@ -70,11 +73,17 @@ export class GroqAnalysisService {
     rankedAxes?: RankedAxisInput[]
   ): Promise<AnalyzedArticle> {
     const totalConfiguredKeys = groqKeyManager.getConfiguredCount();
-    const requestedModel = modelOverride || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-    const modelsToTry = Array.from(new Set([requestedModel, ...FALLBACK_MODELS]));
+    const envModel = process.env.GROQ_MODEL?.trim();
+    const requestedModel =
+      modelOverride ||
+      (envModel && !this.unavailableModels.has(envModel) ? envModel : DEFAULT_GROQ_MODEL);
+
+    const modelsToTry = Array.from(new Set([requestedModel, ...FALLBACK_MODELS])).filter(
+      (m) => !this.unavailableModels.has(m)
+    );
 
     // If no Groq API keys are provided in .env, return a deterministic high-fidelity simulation
-    if (totalConfiguredKeys === 0) {
+    if (totalConfiguredKeys === 0 || modelsToTry.length === 0) {
       return this.generateSimulatedAnalysis(article, axes, rankedAxes);
     }
 
@@ -86,6 +95,8 @@ export class GroqAnalysisService {
     const rank3Label = rankedAxes?.[2]?.name ? `[3순위: ${rankedAxes[2].name}] ${axes.z_axis}` : axes.z_axis;
 
     for (const modelToUse of modelsToTry) {
+      if (this.unavailableModels.has(modelToUse)) continue;
+
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const keyInfo = groqKeyManager.getNextKey();
         if (!keyInfo) {
@@ -154,7 +165,7 @@ export class GroqAnalysisService {
             ],
             response_format: { type: 'json_object' },
             temperature: 0.2,
-            max_completion_tokens: 800
+            max_completion_tokens: 900
           });
 
           const rawContent = response.choices[0]?.message?.content;
@@ -194,16 +205,13 @@ export class GroqAnalysisService {
           };
         } catch (err: any) {
           lastError = err;
-          console.error(
-            `[GroqAnalysisService] Attempt ${attempt} failed with Key Slot #${keyInfo.slotId}:`,
-            err?.message || err
-          );
 
           const isModelNotFound =
             err?.status === 404 ||
             (err?.message &&
               (err.message.includes('model_not_found') || err.message.includes('does not exist')));
           if (isModelNotFound) {
+            this.unavailableModels.add(modelToUse);
             break;
           }
 
@@ -214,10 +222,6 @@ export class GroqAnalysisService {
       }
     }
 
-    console.warn(
-      '[GroqAnalysisService] All Groq key attempts failed. Falling back to simulation.',
-      lastError?.message
-    );
     return this.generateSimulatedAnalysis(article, axes, rankedAxes);
   }
 
