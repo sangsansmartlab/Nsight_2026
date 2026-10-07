@@ -8,12 +8,26 @@ import {
   Key,
   Server,
   RefreshCw,
-  CheckCircle2,
-  Clock,
-  Terminal,
-  Database
+  Terminal
 } from 'lucide-react';
 import { AuthUser } from './AuthModal';
+
+interface GroqSlotStatus {
+  id: number;
+  envVar: string;
+  isConfigured: boolean;
+  maskedKey: string;
+  requestCount: number;
+  rateLimitCount: number;
+  isCoolingDown: boolean;
+  cooldownUntil: number;
+}
+
+interface GroqStatusResponse {
+  totalSlots: number;
+  configuredCount: number;
+  slots: GroqSlotStatus[];
+}
 
 interface AdminDashboardModalProps {
   isOpen: boolean;
@@ -32,7 +46,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   currentQuery,
   onRoleChange
 }) => {
-  const [groqStatus, setGroqStatus] = useState<any>(null);
+  const [groqStatus, setGroqStatus] = useState<GroqStatusResponse | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
   const fetchStatus = () => {
@@ -52,6 +66,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
   if (!isOpen) return null;
 
+  const slotsList: GroqSlotStatus[] = groqStatus?.slots || [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto clean-panel p-5 sm:p-6 rounded-2xl border border-amber-500/40 shadow-2xl space-y-4">
@@ -64,7 +80,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-white text-sm">SMARTLAB 최고 관리자 대시보드 (Admin)</h3>
-              <p className="text-[10px] text-slate-400">플랫폼 모니터링, API 키 풀 및 시스템 헬스체크</p>
+              <p className="text-[10px] text-slate-400">플랫폼 모니터링, Groq 5-Key 로테이션 풀 및 시스템 헬스체크</p>
             </div>
           </div>
           <button
@@ -82,7 +98,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               <Layers className="w-3 h-3 text-blue-400" />
               현재 로드된 노드
             </span>
-            <p className="text-lg font-black text-white font-mono">{totalArticlesCount}개</p>
+            <p className="text-lg font-black text-white font-mono tabular-nums">{totalArticlesCount}개</p>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
@@ -98,8 +114,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               <Key className="w-3 h-3 text-amber-400" />
               Groq 키 풀 가동
             </span>
-            <p className="text-lg font-black text-amber-400 font-mono">
-              {groqStatus?.configuredCount ?? 0} / 5 슬롯
+            <p className="text-lg font-black text-amber-400 font-mono tabular-nums">
+              {groqStatus?.configuredCount ?? 0} / {groqStatus?.totalSlots ?? 5} 슬롯
             </p>
           </div>
 
@@ -130,31 +146,43 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           </div>
 
           <div className="space-y-1.5 text-[11px]">
-            {groqStatus?.poolStatus ? (
-              groqStatus.poolStatus.map((slot: any) => (
-                <div
-                  key={slot.slotId}
-                  className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 font-mono"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-200">슬롯 #{slot.slotId}</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] ${
-                      slot.configured ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'
-                    }`}>
-                      {slot.configured ? '정상 등록됨' : '미등록 (시뮬레이션 모드)'}
-                    </span>
+            {slotsList.length > 0 ? (
+              slotsList.map((slot) => {
+                const remainingSec = slot.isCoolingDown
+                  ? Math.max(0, Math.ceil((slot.cooldownUntil - Date.now()) / 1000))
+                  : 0;
+                return (
+                  <div
+                    key={slot.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 font-mono tabular-nums"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-200">슬롯 #{slot.id}</span>
+                      <span className="text-[10px] text-slate-500">({slot.envVar})</span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] ${
+                          slot.isConfigured
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {slot.isConfigured ? `등록됨 (${slot.maskedKey})` : '시뮬레이션 Fallback'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                      <span>요청: {slot.requestCount}회</span>
+                      <span>제한(429): {slot.rateLimitCount}회</span>
+                      <span className={slot.isCoolingDown ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+                        {slot.isCoolingDown ? `쿨다운 (${remainingSec}초)` : '가용'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
-                    <span>성공: {slot.successCount}회</span>
-                    <span>실패: {slot.failureCount}회</span>
-                    <span className={slot.inCooldown ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
-                      {slot.inCooldown ? `쿨다운 (${slot.cooldownRemainingSeconds}초)` : '가용'}
-                    </span>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <p className="text-slate-500 text-center py-3">키 상태 정보를 불러오는 중...</p>
+              <p className="text-slate-400 text-center py-3">
+                {isLoadingStatus ? '키 상태 정보를 불러오는 중...' : '슬롯 상태 정보가 없습니다.'}
+              </p>
             )}
           </div>
         </div>

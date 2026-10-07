@@ -1,6 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { groqKeyManager } from '../config/keys.js';
-import { groqAnalysisService, ArticleInput, CustomAxesInput } from '../services/groqService.js';
+import {
+  groqAnalysisService,
+  ArticleInput,
+  CustomAxesInput,
+  RankedAxisInput
+} from '../services/groqService.js';
 import { GROQ_AVAILABLE_MODELS } from '../config/groqModels.js';
 import { newsCrawlerService } from '../services/crawlerService.js';
 
@@ -23,7 +28,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  */
 apiRouter.get('/groq/models', (_req: Request, res: Response) => {
   res.json({
-    currentDefault: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
+    currentDefault: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
     models: GROQ_AVAILABLE_MODELS
   });
 });
@@ -45,7 +50,7 @@ apiRouter.get('/groq/status', (_req: Request, res: Response) => {
  */
 apiRouter.post('/analyze', async (req: Request, res: Response) => {
   try {
-    const { articles, custom_axes } = req.body;
+    const { articles, custom_axes, ranked_axes } = req.body;
 
     if (!Array.isArray(articles) || articles.length === 0) {
       return res.status(400).json({ error: 'articles array is required' });
@@ -58,7 +63,17 @@ apiRouter.post('/analyze', async (req: Request, res: Response) => {
       color_axis: '기사 성향 (긍정 / 중립 / 비판)'
     };
 
-    const results = await groqAnalysisService.analyzeBatch(articles, axes, 3);
+    const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
+      ? ranked_axes
+      : undefined;
+
+    const results = await groqAnalysisService.analyzeBatch(
+      articles,
+      axes,
+      3,
+      undefined,
+      rankedAxes
+    );
     res.json({
       status: 'success',
       total: results.length,
@@ -76,7 +91,7 @@ apiRouter.post('/analyze', async (req: Request, res: Response) => {
  */
 apiRouter.post('/search', async (req: Request, res: Response) => {
   try {
-    const { query, display_count, custom_axes } = req.body;
+    const { query, display_count, custom_axes, ranked_axes } = req.body;
 
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'query string is required' });
@@ -89,9 +104,11 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
       z_axis: '정보 신뢰도 & 객관성',
       color_axis: '기사 성향 (긍정 / 중립 / 비판)'
     };
+    const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
+      ? ranked_axes
+      : undefined;
 
-    // 1. Live Web Discovery & Crawling via BeautifulSoup 4 / DOM Engine
-    // (Strict Separation: Search is executed by BeautifulSoup4 / Crawler, NOT Groq)
+    // 1. Live Web Discovery & Crawling via Google News RSS & Daum News DOM Engine
     let candidateArticles: ArticleInput[] = [];
     try {
       candidateArticles = await newsCrawlerService.searchNews(query, count);
@@ -110,11 +127,16 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
       });
     }
 
-    // Only analyze authentic crawled articles (never pad with hallucinated items)
     const articlesToAnalyze = candidateArticles.slice(0, count);
 
     // 2. Groq strictly does 4D Vector Coordinates, 3-line summaries and Rationale inference
-    const analyzed = await groqAnalysisService.analyzeBatch(articlesToAnalyze, axes, 5);
+    const analyzed = await groqAnalysisService.analyzeBatch(
+      articlesToAnalyze,
+      axes,
+      5,
+      undefined,
+      rankedAxes
+    );
 
     res.json({
       status: 'success',

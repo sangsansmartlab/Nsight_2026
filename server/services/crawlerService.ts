@@ -122,7 +122,7 @@ export class NewsCrawlerService {
         let title = rawTitle;
         let publisher = '언론사';
         if (rawTitle.includes(' - ')) {
-          const parts = rawTitle.rsplit ? rawTitle.split(' - ') : rawTitle.split(' - ');
+          const parts = rawTitle.split(' - ');
           publisher = parts[parts.length - 1].trim();
           title = parts.slice(0, parts.length - 1).join(' - ').trim();
         }
