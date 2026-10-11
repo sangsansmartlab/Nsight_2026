@@ -106,45 +106,47 @@ const getCacheKey = (
   query: string,
   count: number,
   axes: CustomAxesInput,
-  rankedAxes?: RankedAxisInput[]
+  rankedAxes?: RankedAxisInput[],
+  mode?: string
 ): string => {
-  return `${query.trim().toLowerCase()}::${count}::${axes.x_axis}::${axes.y_axis}::${axes.z_axis}::${axes.color_axis}::${JSON.stringify(rankedAxes || [])}`;
+  return `${mode || 'news'}::${query.trim().toLowerCase()}::${count}::${axes.x_axis}::${axes.y_axis}::${axes.z_axis}::${axes.color_axis}::${JSON.stringify(rankedAxes || [])}`;
 };
 
 /**
- * Real-time Search and Vectorization Endpoint
+ * Real-time Search and Vectorization Endpoint (Mode-Dedicated 3D Graph)
  */
 apiRouter.post('/search', async (req: Request, res: Response) => {
   try {
-    const { query, display_count, custom_axes, ranked_axes } = req.body;
+    const { query, display_count, custom_axes, ranked_axes, mode } = req.body;
 
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'query string is required' });
     }
 
+    const activeMode: string = typeof mode === 'string' && mode ? mode : 'news';
     const count = Math.min(100, Math.max(1, Number(display_count) || 30));
     const axes: CustomAxesInput = custom_axes || {
-      x_axis: '규제 중심 vs 산업 진흥',
-      y_axis: '사회적 파급력 & 영향도',
-      z_axis: '정보 신뢰도 & 객관성',
-      color_axis: '기사 성향 (긍정 / 중립 / 비판)'
+      x_axis: '반대 ↔ 찬성',
+      y_axis: '파급력',
+      z_axis: '신뢰도',
+      color_axis: '논조'
     };
     const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
-      ? ranked_axes
+      ? rankedAxesFromReq(ranked_axes)
       : undefined;
 
     // Check In-Memory Cache for ultra-fast <10ms response
-    const cacheKey = getCacheKey(query, count, axes, rankedAxes);
+    const cacheKey = getCacheKey(query, count, axes, rankedAxes, activeMode);
     const cached = searchCache.get(cacheKey);
     const now = Date.now();
     if (cached && cached.expiresAt > now) {
       return res.json(cached.data);
     }
 
-    // 1. Live Web Discovery & Crawling via Google News RSS & Parallel Daum News Engine
+    // 1. Live Web Discovery & Crawling via Google News RSS & Parallel Daum News Engine (Tailored per Mode)
     let candidateArticles: ArticleInput[] = [];
     try {
-      candidateArticles = await newsCrawlerService.searchNews(query, count);
+      candidateArticles = await newsCrawlerService.searchNews(query, count, activeMode);
     } catch (crawlErr) {
       console.warn('[Search API] Crawler error, using fallback format:', crawlErr);
     }
@@ -156,24 +158,26 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
         total: 0,
         axes,
         articles: [],
-        message: `'${query}'에 대한 실제 뉴스 보도를 찾지 못했습니다. 보다 널리 쓰이는 키워드로 검색해 보세요.`
+        message: `'${query}'에 대한 해당 모드 기사를 찾지 못했습니다. 보다 널리 쓰이는 키워드로 검색해 보세요.`
       };
       return res.json(emptyResponse);
     }
 
     const articlesToAnalyze = candidateArticles.slice(0, count);
 
-    // 2. Groq parallel multi-article chunk vectorization (5x~10x faster)
+    // 2. Groq parallel multi-article chunk vectorization for this mode's dedicated 3D graph
     const analyzed = await groqAnalysisService.analyzeBatch(
       articlesToAnalyze,
       axes,
       5,
       undefined,
-      rankedAxes
+      rankedAxes,
+      activeMode
     );
 
     const resultPayload = {
       status: 'success',
+      mode: activeMode,
       total: analyzed.length,
       axes,
       articles: analyzed
@@ -195,6 +199,10 @@ apiRouter.post('/search', async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message || 'Search execution failed' });
   }
 });
+
+function rankedAxesFromReq(raw: any[]): RankedAxisInput[] {
+  return raw;
+}
 
 /**
  * In-App Smart Reader Preview & Related Portal News Endpoint
@@ -239,7 +247,7 @@ apiRouter.post('/article-preview', async (req: Request, res: Response) => {
 /**
  * Single Found Article 4D Vectorization & Addition Endpoint
  * Analyzes a single article (from related news, external URL, or title/snippet)
- * against the user's active 1st/2nd/3rd priority axes so it can be added to the 3D space.
+ * against the user's active mode and 1st/2nd/3rd priority axes so it can be added to the 3D space.
  */
 apiRouter.post('/add-article', async (req: Request, res: Response) => {
   try {
@@ -250,18 +258,20 @@ apiRouter.post('/add-article', async (req: Request, res: Response) => {
       pub_date,
       snippet,
       custom_axes,
-      ranked_axes
+      ranked_axes,
+      mode
     } = req.body;
 
     if (!url && !title) {
       return res.status(400).json({ error: 'Either url or title is required' });
     }
 
+    const activeMode: string = typeof mode === 'string' && mode ? mode : 'news';
     const axes: CustomAxesInput = custom_axes || {
-      x_axis: '규제 중심 vs 산업 진흥',
-      y_axis: '사회적 파급력 & 영향도',
-      z_axis: '정보 신뢰도 & 객관성',
-      color_axis: '기사 성향 (긍정 / 중립 / 비판)'
+      x_axis: '반대 ↔ 찬성',
+      y_axis: '파급력',
+      z_axis: '신뢰도',
+      color_axis: '논조'
     };
 
     const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
@@ -281,7 +291,8 @@ apiRouter.post('/add-article', async (req: Request, res: Response) => {
       axes,
       1,
       undefined,
-      rankedAxes
+      rankedAxes,
+      activeMode
     );
 
     if (!analyzedList || analyzedList.length === 0) {

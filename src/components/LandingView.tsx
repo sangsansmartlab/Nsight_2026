@@ -21,7 +21,13 @@ import {
   Sliders
 } from 'lucide-react';
 import { AuthUser } from './AuthModal';
-import { CustomAxes, RankedAxisItem } from '../types';
+import {
+  CustomAxes,
+  RankedAxisItem,
+  SearchModeId,
+  SearchVisualizationModeSpec
+} from '../types';
+import { SEARCH_VISUALIZATION_MODES, getModeSpecById } from '../data/mockDatasets';
 
 export interface RankedAxisPreset {
   id: string;
@@ -30,103 +36,18 @@ export interface RankedAxisPreset {
   colorAxis: string;
 }
 
-export const RANKED_AXIS_PRESETS: RankedAxisPreset[] = [
-  {
-    id: 'economy',
-    label: '경제·산업 (수익성 1순위)',
-    axes: [
-      {
-        id: 'profitability',
-        name: '수익성',
-        negativeLabel: '비용 부담/손실 우려 (-1.0)',
-        positiveLabel: '고수익/실적 성장 (+1.0)',
-        preferredDirection: 1,
-        weight: 50
-      },
-      {
-        id: 'relevance',
-        name: '연관성',
-        negativeLabel: '간접/주변 이슈 (-1.0)',
-        positiveLabel: '핵심 밸류체인 직결 (+1.0)',
-        preferredDirection: 1,
-        weight: 30
-      },
-      {
-        id: 'future',
-        name: '미래 지향성',
-        negativeLabel: '단기 현안 중심 (-1.0)',
-        positiveLabel: '차세대 성장 동력 (+1.0)',
-        preferredDirection: 1,
-        weight: 20
-      }
-    ],
-    colorAxis: '기사 성향 (긍정/호재 / 중립 / 우려/악재)'
-  },
-  {
-    id: 'ai_policy',
-    label: 'AI·기술 정책 (진흥성 1순위)',
-    axes: [
-      {
-        id: 'promotion',
-        name: '산업 진흥성',
-        negativeLabel: '규제/통제 중심 (-1.0)',
-        positiveLabel: '산업 진흥/육성 (+1.0)',
-        preferredDirection: 1,
-        weight: 50
-      },
-      {
-        id: 'impact',
-        name: '사회적 파급력',
-        negativeLabel: '국소적 파급 (-1.0)',
-        positiveLabel: '전방위 사회적 파급 (+1.0)',
-        preferredDirection: 1,
-        weight: 30
-      },
-      {
-        id: 'credibility',
-        name: '정보 신뢰도',
-        negativeLabel: '단순 주장/의혹 (-1.0)',
-        positiveLabel: '공인 통계/실증 (+1.0)',
-        preferredDirection: 1,
-        weight: 20
-      }
-    ],
-    colorAxis: '기사 성향 (진흥/긍정 / 중립 / 규제/우려)'
-  },
-  {
-    id: 'society',
-    label: '사회·공공 갈등 (파급력 1순위)',
-    axes: [
-      {
-        id: 'social_impact',
-        name: '사회적 파급력',
-        negativeLabel: '낮은 체감도 (-1.0)',
-        positiveLabel: '국민적 핵심 쟁점 (+1.0)',
-        preferredDirection: 1,
-        weight: 50
-      },
-      {
-        id: 'policy_stance',
-        name: '정책 추진 대립각',
-        negativeLabel: '현장 반발/우려 (-1.0)',
-        positiveLabel: '정부/제도 추진 (+1.0)',
-        preferredDirection: 0,
-        weight: 30
-      },
-      {
-        id: 'fact_rigor',
-        name: '근거 객관성',
-        negativeLabel: '일방적 성명 (-1.0)',
-        positiveLabel: '공론화/실증 데이터 (+1.0)',
-        preferredDirection: 1,
-        weight: 20
-      }
-    ],
-    colorAxis: '기사 성향 (찬성/추진 / 중립 / 반대/우려)'
-  }
-];
+export const RANKED_AXIS_PRESETS: RankedAxisPreset[] = SEARCH_VISUALIZATION_MODES.map(
+  (m) => ({
+    id: m.id,
+    label: `${m.mode} (${m.axes.x})`,
+    axes: m.rankedAxes,
+    colorAxis: m.colorAxisDescription
+  })
+);
 
 interface LandingViewProps {
+  activeMode: SearchModeId;
+  onSelectModeGraph: (modeId: SearchModeId, openExplorerImmediately?: boolean) => void;
   searchFilter: string;
   setSearchFilter: (query: string) => void;
   onSearch: (e?: React.FormEvent, queryOverride?: string) => void;
@@ -157,6 +78,8 @@ interface LandingViewProps {
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
+  activeMode,
+  onSelectModeGraph,
   searchFilter,
   setSearchFilter,
   onSearch,
@@ -185,7 +108,12 @@ export const LandingView: React.FC<LandingViewProps> = ({
   searchFeedbackToast,
   onClearFeedbackToast
 }) => {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isModeTableOpen, setIsModeTableOpen] = useState(false);
+  const [isModeWindowOpen, setIsModeWindowOpen] = useState(true);
+  const [isSearchWindowOpen, setIsSearchWindowOpen] = useState(true);
+
+  const currentModeSpec: SearchVisualizationModeSpec = getModeSpecById(activeMode);
 
   const rankBadgeStyles = [
     {
@@ -227,7 +155,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base tracking-tight text-white">NSight 3D</span>
               <span className="text-xs text-slate-400 hidden sm:inline">
-                · 상산고등학교 SMARTLAB 실시간 뉴스 3D 인텔리전스
+                · 상산고등학교 SMARTLAB 7대 모드별 독립 3D 인텔리전스
               </span>
             </div>
           </div>
@@ -238,10 +166,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
             type="button"
             onClick={onEnterExplorer}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-300 border border-blue-500/40 transition-all text-xs font-semibold shadow-sm whitespace-nowrap"
-            title="현재 설정된 기준과 가중치로 3D 공간 바로 열기"
+            title="현재 선택된 모드의 전용 3D 공간 바로 열기"
           >
             <Box className="w-3.5 h-3.5 text-blue-400" />
-            <span>3D 공간 바로보기</span>
+            <span>{currentModeSpec.mode} 3D 공간 바로보기</span>
           </button>
 
           {currentUser?.role === 'ADMIN' && (
@@ -309,7 +237,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
         {/* Hero Title */}
         <div className="text-center space-y-2">
           <p className="text-xs font-semibold text-blue-400 tracking-wide">
-            개인 맞춤형 1·2·3순위 축 가중치 & 실시간 뉴스 3D 공간 검색 엔진
+            7대 탐색·시각화 모드별 독립 3D 그래프 & 다차원 인텔리전스 엔진
           </p>
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
             NSight{' '}
@@ -317,81 +245,239 @@ export const LandingView: React.FC<LandingViewProps> = ({
               3D
             </span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
-            내가 중요하게 생각하는 <strong>1순위 · 2순위 · 3순위 좌표축과 가중치(%)</strong>를 직접 조절하면,
-            검색 시 가장 부합하는 기사를 최상단에 띄우고 3D 좌표평면에 각 기사의 경향성을 입체적으로 시각화합니다.
+          <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mx-auto leading-relaxed">
+            원하는 <strong>모드(뉴스 · 쇼핑 · 논문 · 특허 · 통계 · 지식 · 심층)</strong>를 선택하면,
+            해당 모드의 전용 기사들만 모여 있는 독립된 3D 그래프 공간으로 이동합니다.
           </p>
         </div>
 
-        {/* Main Search Input Form */}
-        <div className="w-full max-w-3xl space-y-3">
-          <form
-            onSubmit={(e) => onSearch(e)}
-            className="relative flex items-center bg-slate-900/90 rounded-2xl border-2 border-blue-500/50 shadow-2xl shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/20 transition-all p-1.5 sm:p-2"
-          >
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all text-xs font-semibold shrink-0 ${
-                isSettingsOpen
-                  ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-              title="1·2·3순위 축 및 가중치 설정 열기/닫기"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-blue-400" />
-              <span className="hidden xs:inline">
-                축 순위·가중치 ({normalizedWeights[0]}:{normalizedWeights[1]}:{normalizedWeights[2]})
-              </span>
-              {isSettingsOpen ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
-            </button>
-
-            <div className="w-[1px] h-6 bg-slate-700/80 mx-1 sm:mx-2 shrink-0" />
-
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="검색할 뉴스 키워드를 입력하세요 (예: AI 기본법, 반도체, 금리)"
-              aria-label="뉴스 키워드 검색"
-              className="bg-transparent text-white placeholder-slate-500 px-2 py-2 w-full focus:outline-none text-sm font-medium"
-              autoFocus
-            />
-
-            {searchFilter && (
+        {/* Quick Toggle Strip when Search Window or Mode Window is closed */}
+        {(!isSearchWindowOpen || !isModeWindowOpen) && (
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {!isSearchWindowOpen && (
               <button
                 type="button"
-                onClick={() => setSearchFilter('')}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors mr-1 shrink-0"
-                title="입력 내용 지우기"
+                onClick={() => setIsSearchWindowOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Search className="w-3.5 h-3.5 text-blue-400" />
+                <span>{currentModeSpec.mode} 검색창 열기</span>
+              </button>
+            )}
+            {!isModeWindowOpen && (
+              <button
+                type="button"
+                onClick={() => setIsModeWindowOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5 text-blue-400" />
+                <span>모드 그래프 이동 창 열기 ({currentModeSpec.mode})</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Main Search Input Form + Mode Chips Directly Adjacent */}
+        <div className="w-full max-w-3xl space-y-2.5">
+          {isSearchWindowOpen && (
+            <form
+              onSubmit={(e) => onSearch(e)}
+              className="relative flex items-center bg-slate-900/90 rounded-2xl border-2 border-blue-500/50 shadow-2xl shadow-blue-500/10 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/20 transition-all p-1.5 sm:p-2"
+            >
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`px-2.5 py-2 rounded-xl flex items-center gap-1.5 transition-all text-xs font-semibold shrink-0 ${
+                  isSettingsOpen
+                    ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="1·2·3순위 축 및 가중치 설정 열기/닫기"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-blue-400" />
+                <span className="hidden xs:inline">축·가중치</span>
+                {isSettingsOpen ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </button>
+
+              <div className="w-[1px] h-6 bg-slate-700/80 mx-1 sm:mx-2 shrink-0" />
+
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder={`[${currentModeSpec.mode}] 검색할 키워드를 입력하세요 (예: AI 기본법, 온디바이스 AI)`}
+                aria-label="키워드 검색"
+                className="bg-transparent text-white placeholder-slate-500 px-2 py-2 w-full focus:outline-none text-sm font-medium"
+                autoFocus
+              />
+
+              {searchFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSearchFilter('')}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors mr-1 shrink-0"
+                  title="입력 내용 지우기"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSearching || !searchFilter.trim()}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30 shrink-0 whitespace-nowrap"
+                title="선택한 모드로 3D 기사 수집·분석 시작"
+              >
+                {isSearching ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>탐색 중</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>{currentModeSpec.mode} 검색</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSearchWindowOpen(false)}
+                className="ml-1.5 p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors shrink-0"
+                title="검색창 닫기"
               >
                 <X className="w-4 h-4" />
               </button>
-            )}
+            </form>
+          )}
 
-            <button
-              type="submit"
-              disabled={isSearching || !searchFilter.trim()}
-              className="px-4 sm:px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30 shrink-0 whitespace-nowrap"
-              title="3D 뉴스 분석 시작"
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>수집·분석 중...</span>
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4" />
-                  <span>실시간 3D 탐색</span>
-                </>
+          {/* Closable 7-Mode Dedicated Graph Switcher Window */}
+          {isModeWindowOpen && (
+            <div className="clean-panel p-3 rounded-2xl border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-slate-400 mr-1 whitespace-nowrap">
+                    모드 그래프 이동:
+                  </span>
+                  {SEARCH_VISUALIZATION_MODES.map((m) => {
+                    const isActive = activeMode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => onSelectModeGraph(m.id, true)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400'
+                            : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        {m.mode}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsModeTableOpen(!isModeTableOpen)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    {isModeTableOpen ? '모드 기준표 닫기' : '모드 기준표'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsModeWindowOpen(false)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="모드 그래프 이동 창 닫기"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>닫기</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Compact Mode Axis Strip */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs text-slate-300">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-white">{currentModeSpec.mode}</span>
+                  <span aria-hidden="true" className="text-slate-600">·</span>
+                  <span className="text-blue-300 font-medium">{currentModeSpec.purpose}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap font-mono tabular-nums">
+                  <span>X: <strong className="text-rose-300">{currentModeSpec.axes.x}</strong></span>
+                  <span>· Y: <strong className="text-emerald-300">{currentModeSpec.axes.y}</strong></span>
+                  <span>· Z: <strong className="text-purple-300">{currentModeSpec.axes.z}</strong></span>
+                  <span>· 색: <strong className="text-amber-300">{currentModeSpec.axes.color}</strong></span>
+                </div>
+              </div>
+
+              {/* Interactive Mode List Reference Table (Collapsible) */}
+              {isModeTableOpen && (
+                <div className="pt-2 overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs bg-slate-950/80 rounded-xl overflow-hidden border border-slate-800">
+                    <thead>
+                      <tr className="bg-slate-900/90 text-slate-300 border-b border-slate-800">
+                        <th className="py-2 px-3 font-bold whitespace-nowrap">모드</th>
+                        <th className="py-2 px-3 font-bold whitespace-nowrap">이럴 때 쓰세요</th>
+                        <th className="py-2 px-3 font-bold whitespace-nowrap text-rose-300">X축</th>
+                        <th className="py-2 px-3 font-bold whitespace-nowrap text-emerald-300">Y축</th>
+                        <th className="py-2 px-3 font-bold whitespace-nowrap text-purple-300">Z축</th>
+                        <th className="py-2 px-3 font-bold whitespace-nowrap text-amber-300">색상</th>
+                        <th className="py-2 px-3 font-bold whitespace-nowrap text-right">전용 그래프</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/70">
+                      {SEARCH_VISUALIZATION_MODES.map((m) => {
+                        const isSelected = activeMode === m.id;
+                        return (
+                          <tr
+                            key={m.id}
+                            onClick={() => onSelectModeGraph(m.id, true)}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-blue-950/60 text-white'
+                                : 'hover:bg-slate-900/70 text-slate-300'
+                            }`}
+                          >
+                            <td className="py-2 px-3 font-bold whitespace-nowrap text-white">
+                              {m.mode}
+                            </td>
+                            <td className="py-2 px-3 text-slate-300 whitespace-nowrap">
+                              {m.purpose}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap font-medium text-rose-200">
+                              {m.axes.x}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap font-medium text-emerald-200">
+                              {m.axes.y}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap font-medium text-purple-200">
+                              {m.axes.z}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap font-medium text-amber-200">
+                              {m.axes.color}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap text-right">
+                              <span className="text-[11px] font-bold text-blue-400 hover:underline">
+                                그래프 이동 →
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </button>
-          </form>
+            </div>
+          )}
 
           {/* Integrated 1st/2nd/3rd Priority Axes, Custom Weights & Personal Tendency Settings Panel */}
           {isSettingsOpen && (
@@ -404,7 +490,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-slate-400 mr-1">분야별 추천 순위:</span>
+                  <span className="text-[11px] text-slate-400 mr-1">7대 모드 축 프리셋:</span>
                   {RANKED_AXIS_PRESETS.map((preset) => (
                     <button
                       key={preset.id}

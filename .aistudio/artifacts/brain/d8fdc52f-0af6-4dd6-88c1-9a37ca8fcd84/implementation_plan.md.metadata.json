@@ -1,0 +1,6 @@
+{
+  "summary":  "Revised implementation plan: Each of the 7 modes (뉴스, 쇼핑, 논문, 특허, 통계, 지식, 심층 모드) operates as its own independent 3D graph space containing exclusively the articles/items gathered and analyzed for that mode. Clicking a mode chip button navigates directly to that mode's dedicated 3D graph rather than rearranging a mixed graph.",
+  "updatedAt":  "2026-10-11T22:51:38.362298657Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

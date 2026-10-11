@@ -227,18 +227,55 @@ export class NewsCrawlerService {
   }
 
   /**
-   * Primary entry point: Queries Google News RSS and Daum News in parallel,
-   * performs deduplication and smart relevance ranking.
+   * Builds a mode-specific search query so each mode's 3D graph collects only articles belonging to that mode.
    */
-  public async searchNews(query: string, count: number = 30): Promise<CrawledArticle[]> {
+  public buildModeQuery(rawQuery: string, mode?: string): string {
+    const base = rawQuery.trim();
+    if (!base) return '';
+    switch (mode) {
+      case 'shopping':
+        return `${base} 비교 가격 성능 후기 가성비`;
+      case 'paper':
+        return `${base} 연구 논문 학술 실험 결과`;
+      case 'patent':
+        return `${base} 특허 출원 기술 개발`;
+      case 'stats':
+        return `${base} 통계 조사 수치 데이터 비율`;
+      case 'knowledge':
+        return `${base} 원리 개념 해설 가이드`;
+      case 'deep':
+        return `${base} 심층 분석 쟁점 전망`;
+      case 'news':
+      default:
+        return base;
+    }
+  }
+
+  /**
+   * Primary entry point: Queries Google News RSS and Daum News in parallel,
+   * performs deduplication and smart relevance ranking for the selected mode.
+   */
+  public async searchNews(
+    query: string,
+    count: number = 30,
+    mode?: string
+  ): Promise<CrawledArticle[]> {
     const trimmed = (query || '').trim();
     if (!trimmed) return [];
 
-    // 1. Fetch from Google News RSS and Daum News in parallel
+    const effectiveQuery = this.buildModeQuery(trimmed, mode);
+
+    // 1. Fetch from Google News RSS and Daum News in parallel using mode-specific query
     const [googleResults, daumResults] = await Promise.all([
-      this.searchWithGoogleNewsRss(trimmed, count),
-      this.searchWithDomParser(trimmed, count)
+      this.searchWithGoogleNewsRss(effectiveQuery, count),
+      this.searchWithDomParser(effectiveQuery, count)
     ]);
+
+    // Fallback to base query if mode-specific query yielded too few articles
+    let extraResults: CrawledArticle[] = [];
+    if (googleResults.length + daumResults.length < Math.min(5, count) && effectiveQuery !== trimmed) {
+      extraResults = await this.searchWithGoogleNewsRss(trimmed, count);
+    }
 
     // 2. Combine and deduplicate
     const combined: CrawledArticle[] = [];
@@ -248,7 +285,7 @@ export class NewsCrawlerService {
       t.replace(/[\s\[\]\'\"()…·\-_]/g, '').toLowerCase();
 
     // Interleave results to provide balanced press perspective
-    const maxLen = Math.max(googleResults.length, daumResults.length);
+    const maxLen = Math.max(googleResults.length, daumResults.length, extraResults.length);
     for (let i = 0; i < maxLen; i++) {
       if (i < googleResults.length) {
         const item = googleResults[i];
@@ -260,6 +297,14 @@ export class NewsCrawlerService {
       }
       if (i < daumResults.length) {
         const item = daumResults[i];
+        const norm = normalizeTitle(item.title);
+        if (norm && !seenTitles.has(norm)) {
+          seenTitles.add(norm);
+          combined.push(item);
+        }
+      }
+      if (i < extraResults.length) {
+        const item = extraResults[i];
         const norm = normalizeTitle(item.title);
         if (norm && !seenTitles.has(norm)) {
           seenTitles.add(norm);
