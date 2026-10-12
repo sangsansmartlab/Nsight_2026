@@ -22,7 +22,6 @@ import {
   ArticlePreviewContent,
   RelatedPortalArticle
 } from '../types';
-import { buildPortalLinksForArticle } from '../utils/newsPortalLinks';
 
 interface ArticleReaderModalProps {
   isOpen: boolean;
@@ -125,8 +124,6 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
 
   if (!isOpen || !article) return null;
 
-  const portalLinks = previewData?.portalLinks || buildPortalLinksForArticle(article);
-
   const handleResetCoords = () => {
     const orig = existingEvaluation?.originalCoords || article.coordinates;
     setCalX(Number(orig.x.toFixed(2)));
@@ -186,51 +183,21 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
           </button>
         </div>
 
-        {/* Direct External News Media Portal Bar (Naver / Google / Daum / Publisher) */}
+        {/* Direct Original News Article Link Bar */}
         <div className="px-5 py-2.5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-            <Newspaper className="w-3.5 h-3.5 text-emerald-400" />
-            이 기사를 외부 뉴스 매개체에서 바로 열기:
+            <Newspaper className="w-3.5 h-3.5 text-blue-400" />
+            <span>스크래핑 원문 기사:</span>
           </span>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <a
-              href={portalLinks.naver}
+              href={article.origin_link}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
             >
-              <span className="font-black">N</span>
-              <span>네이버 뉴스에서 보기</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href={portalLinks.google}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
-            >
-              <span className="font-black">G</span>
-              <span>구글 뉴스에서 보기</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href={portalLinks.daum}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
-            >
-              <span className="font-black">D</span>
-              <span>다음 뉴스에서 보기</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href={portalLinks.original}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs flex items-center gap-1.5 transition-colors"
-            >
-              <span>{article.publisher} 원문 이동</span>
-              <ExternalLink className="w-3 h-3" />
+              <span>{article.publisher} 원문 기사 바로보기</span>
+              <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </div>
@@ -332,12 +299,13 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
                       >
                         <div className="min-w-0 flex-1">
                           <a
-                            href={rel.naverLink}
+                            href={rel.link || rel.naverLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs font-bold text-slate-200 hover:text-emerald-400 transition-colors line-clamp-1"
+                            className="text-xs font-bold text-slate-200 hover:text-blue-400 transition-colors line-clamp-1 flex items-center gap-1"
                           >
-                            {rel.title}
+                            <span>{rel.title}</span>
+                            <ExternalLink className="w-3 h-3 text-slate-400 shrink-0" />
                           </a>
                           <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
                             <span className="font-semibold text-slate-300">{rel.publisher}</span>

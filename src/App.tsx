@@ -6,17 +6,13 @@ import { SnapshotsDrawer, SearchHistoryItem } from './components/SnapshotsDrawer
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { RbacGuardModal } from './components/RbacGuardModal';
 import { ArticleReaderModal } from './components/ArticleReaderModal';
-import { NSightLogo } from './components/NSightLogo';
-import { HierarchicalAxisSettings } from './components/HierarchicalAxisSettings';
+import { LogoSideDrawer } from './components/LogoSideDrawer';
+import { NsightLogo } from './components/NsightLogo';
 import {
   exportArticlesToCSV,
   exportArticlesToJSON,
   captureCanvasToPNG
 } from './utils/exportUtils';
-import {
-  buildPortalLinksForArticle,
-  buildPortalLinksForQuery
-} from './utils/newsPortalLinks';
 import { DEMO_DATASETS, DatasetItem } from './data/mockDatasets';
 import {
   Article,
@@ -179,11 +175,9 @@ export const App: React.FC = () => {
     () => typeof window !== 'undefined' && window.innerWidth < 768
   );
 
-  // Left & Right side panels fold/unfold states (Both collapsible; auto-collapse on search)
-  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(
-    () => typeof window !== 'undefined' && window.innerWidth >= 768
-  );
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(true);
+  // Left & Right side panels fold/unfold states (Both hidden by default; expandable via logo tab window)
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(false);
 
   // Search customization & 1·2·3순위 settings modal state
   const [isCustomSettingsOpen, setIsCustomSettingsOpen] = useState<boolean>(false);
@@ -202,6 +196,8 @@ export const App: React.FC = () => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState<boolean>(false);
   const [articleShareToast, setArticleShareToast] = useState<string | null>(null);
   const [isReaderModalOpen, setIsReaderModalOpen] = useState<boolean>(false);
+  const [isLogoDrawerOpen, setIsLogoDrawerOpen] = useState<boolean>(false);
+  const [isLandingSettingsOpen, setIsLandingSettingsOpen] = useState<boolean>(false);
 
   // Personal Article Evaluations & Adaptive Coordinate Axis Evolution State
   const [evaluations, setEvaluations] = useState<Record<string, ArticleEvaluation>>(() => {
@@ -855,7 +851,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (appMode === 'EXPLORER' && topMatchedScoredArticle) {
       setSelectedArticle(topMatchedScoredArticle.article);
-      setIsRightPanelOpen(true);
     }
   }, [dataset.id, appMode]);
 
@@ -1209,6 +1204,61 @@ export const App: React.FC = () => {
           }}
           searchFeedbackToast={searchFeedbackToast}
           onClearFeedbackToast={() => setSearchFeedbackToast(null)}
+          onOpenLogoDrawer={() => setIsLogoDrawerOpen(true)}
+          isSettingsOpen={isLandingSettingsOpen}
+          onToggleSettings={() => setIsLandingSettingsOpen((prev) => !prev)}
+        />
+        <LogoSideDrawer
+          isOpen={isLogoDrawerOpen}
+          onClose={() => setIsLogoDrawerOpen(false)}
+          appMode={appMode}
+          onNavigateHome={() => setAppMode('LANDING')}
+          onNavigateExplorer={() => {
+            handleApplyAxesToCurrentView();
+            setAppMode('EXPLORER');
+          }}
+          currentUser={currentUser}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onLogout={handleLogout}
+          onOpenAdmin={() => {
+            if (requireAuth('관리자 대시보드', 'ADMIN')) {
+              setIsAdminModalOpen(true);
+            }
+          }}
+          onOpenSnapshots={() => {
+            if (requireAuth('3D 스냅샷 및 검색 히스토리')) {
+              setIsSnapshotsDrawerOpen(true);
+            }
+          }}
+          onOpenCustomSettings={() => setIsCustomSettingsOpen(true)}
+          onOpenColorGuide={() => setIsColorGuideOpen(true)}
+          rankedAxes={rankedAxes}
+          normalizedWeights={normalizedWeights}
+          onUpdateRankedAxis={handleUpdateRankedAxis}
+          onApplyWeightPreset={handleApplyWeightPreset}
+          onSwapRankedAxes={handleSwapRankedAxes}
+          searchCount={searchCount}
+          setSearchCount={setSearchCount}
+          onSelectHistoryQuery={(q) => {
+            setSearchFilter(q);
+            handlePerformSearch(undefined, q);
+            setIsLogoDrawerOpen(false);
+          }}
+          onLoadSnapshot={(snapshot) => {
+            setDataset(snapshot.dataset);
+            setCurrentQuery(snapshot.query);
+            setCustomAxes(snapshot.axes);
+            setEnableColorAxis(
+              Boolean(snapshot.axes.color_axis && snapshot.axes.color_axis.trim())
+            );
+            setIsLogoDrawerOpen(false);
+            setAppMode('EXPLORER');
+          }}
+          onExportCSV={handleExportCSV}
+          onExportJSON={handleExportJSON}
+          onCapturePNG={handleCapturePNG}
+          isSettingsOpen={isLandingSettingsOpen}
+          onToggleSettings={() => setIsLandingSettingsOpen((prev) => !prev)}
         />
         <AuthModal
           isOpen={isAuthModalOpen}
@@ -1299,45 +1349,25 @@ export const App: React.FC = () => {
         <div className="space-y-2">
           {/* 1. Top Header Bar */}
           <header className="pointer-events-auto clean-panel px-3 py-2 rounded-xl border border-white/10 shadow-2xl flex items-center justify-between gap-2 flex-wrap">
-            {/* Brand & Home Navigation */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            {/* Brand & Menu Navigation */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsLogoDrawerOpen(true)}
+                className="text-left group cursor-pointer focus:outline-none hover:opacity-90 transition-opacity"
+                title="NSight 3D 로고 (클릭 시 탭창 열기)"
+              >
+                <NsightLogo size="xs" variant="compact" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setAppMode('LANDING')}
-                className="flex items-center gap-2 text-left group cursor-pointer hover:opacity-90 transition-opacity"
+                className="ml-0.5 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 title="첫 랜딩 화면으로 이동 (홈)"
               >
-                <NSightLogo variant="header" size="sm" showSlogan={false} />
+                <Home className="w-4 h-4" />
               </button>
-
-              <button
-                type="button"
-                onClick={() => setAppMode('LANDING')}
-                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-[11px] font-medium text-slate-300 hover:text-cyan-300 border border-white/5 transition-colors cursor-pointer"
-                title="랜딩 화면으로 이동"
-              >
-                <Home className="w-3 h-3 text-cyan-400" />
-                <span>홈</span>
-              </button>
-
-              {/* Demo Issue Quick Switcher */}
-              <div className="hidden lg:flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 ml-2">
-                <span className="text-[10px] text-slate-400 px-1.5 font-medium">이슈:</span>
-                {Object.keys(DEMO_DATASETS).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleSelectDataset(key)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors whitespace-nowrap ${
-                      currentQuery === key
-                        ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 font-bold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    }`}
-                  >
-                    {key}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Camera View Presets */}
@@ -1372,10 +1402,10 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsCustomSettingsOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/35 text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer shadow-sm shadow-cyan-500/10"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] font-bold transition-all whitespace-nowrap"
                 title="좌표축 1·2·3순위, 가중치(%) 및 개인 경향성 설정"
               >
-                <Target className="w-3.5 h-3.5 text-cyan-400" />
+                <Target className="w-3.5 h-3.5 text-amber-400" />
                 <span>
                   축 순위·가중치 ({normalizedWeights[0]}:{normalizedWeights[1]}:{normalizedWeights[2]})
                 </span>
@@ -1488,9 +1518,9 @@ export const App: React.FC = () => {
           >
             <form
               onSubmit={handlePerformSearch}
-              className="flex items-center bg-slate-900/90 backdrop-blur-xl rounded-xl border-2 border-cyan-500/40 shadow-2xl shadow-cyan-500/10 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-500/25 transition-all p-1"
+              className="flex items-center bg-slate-900/95 backdrop-blur-md rounded-xl border-2 border-blue-500/60 shadow-2xl shadow-blue-500/15 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all p-1"
             >
-              <div className="flex items-center gap-1.5 pl-2.5 pr-2 text-cyan-400 text-xs font-bold shrink-0">
+              <div className="flex items-center gap-1.5 pl-2.5 pr-2 text-blue-400 text-xs font-bold shrink-0">
                 <Search className="w-4 h-4" />
                 <span className="hidden sm:inline">기사 검색</span>
               </div>
@@ -1519,7 +1549,7 @@ export const App: React.FC = () => {
                     setSearchFilter('');
                     setIsSearchDropdownOpen(false);
                   }}
-                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors mr-1 shrink-0 cursor-pointer"
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors mr-1 shrink-0"
                   title="검색어 지우기"
                 >
                   <X className="w-4 h-4" />
@@ -1529,7 +1559,7 @@ export const App: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSearching || !searchFilter.trim()}
-                className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-40 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-md shadow-cyan-600/30 shrink-0 whitespace-nowrap cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm shadow-blue-600/30 shrink-0 whitespace-nowrap"
                 title="입력한 키워드로 새로운 3D 좌표 공간 생성"
               >
                 {isSearching ? (
@@ -1601,49 +1631,39 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Direct External News Media Portal Bar for Search Query */}
-                {(() => {
-                  const qLinks = buildPortalLinksForQuery(searchFilter || currentQuery);
-                  return (
-                    <div className="px-3.5 py-2 bg-slate-900/95 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                      <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                        <Newspaper className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>
-                          ‘{(searchFilter || currentQuery).trim()}’ 외부 뉴스 매개체 바로 열기:
-                        </span>
+                {/* Live Web Search Action Trigger (When user types a search query) */}
+                {searchFilter.trim() && (
+                  <div className="px-3.5 py-2.5 bg-gradient-to-r from-blue-950/80 via-slate-900/90 to-indigo-950/80 border-b border-blue-500/30 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-300 min-w-0">
+                      <Sparkles className="w-4 h-4 text-blue-400 shrink-0 animate-pulse" />
+                      <span className="truncate">
+                        ‘<strong className="text-white">{searchFilter}</strong>’ 실시간 웹 뉴스 수집 & Groq 4D 분석
                       </span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <a
-                          href={qLinks.naver}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>N 네이버 뉴스</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        <a
-                          href={qLinks.google}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>G 구글 뉴스</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                        <a
-                          href={qLinks.daum}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>D 다음 뉴스</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      </div>
                     </div>
-                  );
-                })()}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isSearching}
+                        onClick={() => handlePerformSearch(undefined, searchFilter, false)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-[11px] inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                        title="입력한 키워드로 웹 전체 실시간 뉴스 수집 및 4D 벡터화 (Enter)"
+                      >
+                        {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                        <span>새 3D 공간 탐색 (Enter)</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSearching}
+                        onClick={() => handlePerformSearch(undefined, searchFilter, true)}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-700/80 hover:bg-cyan-600 text-cyan-100 font-bold text-[11px] inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                        title="현재 3D 좌표 공간에 검색된 기사를 새로운 점으로 추가"
+                      >
+                        <PlusCircle className="w-3 h-3 text-cyan-300" />
+                        <span>+ 현재 좌표에 추가</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Quick #Keyword Filter Bar */}
                 {availableKeywords.length > 0 && (
@@ -1699,7 +1719,6 @@ export const App: React.FC = () => {
                       const isSel = activeSelectedArticle?.id === article.id;
                       const hasEval = Boolean(evaluations[article.id]);
                       const isNewlyAdded = addedArticleIds.includes(article.id);
-                      const artLinks = buildPortalLinksForArticle(article);
                       return (
                         <div
                           key={article.id}
@@ -1766,13 +1785,14 @@ export const App: React.FC = () => {
                                 <span>인앱 리더</span>
                               </button>
                               <a
-                                href={artLinks.naver}
+                                href={article.origin_link}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-2 py-0.5 rounded bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-bold text-[10px]"
-                                title="네이버 뉴스에서 이 기사 검색 결과 열기"
+                                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-[10px] flex items-center gap-1 transition-colors"
+                                title="스크래핑 언론사 원문 기사 바로보기"
                               >
-                                N뉴스
+                                <span>원문</span>
+                                <ExternalLink className="w-2.5 h-2.5 text-blue-400" />
                               </a>
                             </div>
                             <div className="font-mono tabular-nums text-[10px] text-slate-400">
@@ -1812,46 +1832,331 @@ export const App: React.FC = () => {
 
         {/* Search Customization & 1st/2nd/3rd Priority Ranked Axes + Weight Modal */}
         {isCustomSettingsOpen && (
-          <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto glass-cube-panel p-5 rounded-2xl border border-white/10 shadow-2xl space-y-4 text-xs">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto clean-panel p-4.5 sm:p-5 rounded-2xl border border-blue-500/40 shadow-2xl space-y-4 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-cyan-400" />
+                  <Settings2 className="w-4 h-4 text-amber-400" />
                   <h3 className="font-bold text-white text-sm">
-                    좌표축 1·2·3순위 & 개인 가중치(%) · 경향성 설정
+                    좌표축 1·2·3순위 & 개인 가중치(%) · 경향성 커스터마이징
                   </h3>
                 </div>
                 <button
                   onClick={() => setIsCustomSettingsOpen(false)}
-                  className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
                   title="닫기"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <HierarchicalAxisSettings
-                rankedAxes={rankedAxes}
-                normalizedWeights={normalizedWeights}
-                onUpdateRankedAxis={handleUpdateRankedAxis}
-                onApplyWeightPreset={handleApplyWeightPreset}
-                onSwapRankedAxes={handleSwapRankedAxes}
-                onApplyPresetRankedAxes={handleApplyPresetRankedAxes}
-                preferredSentiment={preferredSentiment}
-                setPreferredSentiment={setPreferredSentiment}
-                interestKeywordsInput={interestKeywordsInput}
-                setInterestKeywordsInput={setInterestKeywordsInput}
-                searchCount={searchCount}
-                setSearchCount={setSearchCount}
-                enableColorAxis={enableColorAxis}
-                setEnableColorAxis={setEnableColorAxis}
-                customAxes={customAxes}
-                setCustomAxes={setCustomAxes}
-                onApplyAxesToCurrentView={() => {
-                  handleApplyAxesToCurrentView();
-                  setIsCustomSettingsOpen(false);
-                }}
-              />
+              {/* Domain Ranked Axis Presets */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-slate-400 mr-1">분야별 추천 순위 프리셋:</span>
+                {RANKED_AXIS_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleApplyPresetRankedAxes(preset)}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-slate-200 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 text-[11px] font-medium transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Weight Ratio Quick Presets Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-slate-300 font-semibold">반영 가중치 비율:</span>
+                  <span className="font-mono tabular-nums font-bold text-amber-300">
+                    1순위 {normalizedWeights[0]}% : 2순위 {normalizedWeights[1]}% : 3순위 {normalizedWeights[2]}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyWeightPreset(50, 30, 20)}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono"
+                  >
+                    기본 (50:30:20)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyWeightPreset(70, 20, 10)}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono"
+                  >
+                    1순위 집중 (70:20:10)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyWeightPreset(34, 33, 33)}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono"
+                  >
+                    균등 (34:33:33)
+                  </button>
+                </div>
+              </div>
+
+              {/* 1st / 2nd / 3rd Priority Axes Configuration + Weight Sliders */}
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center text-[11px] text-slate-400">
+                  <span>각 축의 가중치(0~100)를 슬라이더나 숫자로 직접 조절하세요</span>
+                  <span className="font-mono text-amber-400">↑/↓ 클릭 시 순위·좌표 즉시 스왑</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {rankedAxes.map((axisItem, idx) => {
+                    const rankIdx = idx as 0 | 1 | 2;
+                    const colors = [
+                      'border-rose-500/40 text-rose-400',
+                      'border-emerald-500/40 text-emerald-400',
+                      'border-purple-500/40 text-purple-400'
+                    ];
+                    const accents = ['accent-rose-500', 'accent-emerald-500', 'accent-purple-500'];
+                    const axisCode = [
+                      `X축 (1순위 · ${normalizedWeights[0]}%)`,
+                      `Y축 (2순위 · ${normalizedWeights[1]}%)`,
+                      `Z축 (3순위 · ${normalizedWeights[2]}%)`
+                    ][rankIdx];
+
+                    return (
+                      <div
+                        key={axisItem.id + idx}
+                        className={`p-3 rounded-xl bg-slate-900 border ${colors[rankIdx]} space-y-2`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[11px]">{axisCode}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={rankIdx === 0}
+                              onClick={() =>
+                                handleSwapRankedAxes(rankIdx, (rankIdx - 1) as 0 | 1 | 2)
+                              }
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200"
+                              title="순위 올리기"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={rankIdx === 2}
+                              onClick={() =>
+                                handleSwapRankedAxes(rankIdx, (rankIdx + 1) as 0 | 1 | 2)
+                              }
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200"
+                              title="순위 내리기"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Individual Weight Control */}
+                        <div className="p-2 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-slate-300 font-semibold">가중치 조절</span>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={axisItem.weight}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  handleUpdateRankedAxis(rankIdx, {
+                                    weight: isNaN(val) ? 0 : Math.max(0, Math.min(100, val))
+                                  });
+                                }}
+                                className="w-12 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-center font-mono tabular-nums font-bold text-amber-300 text-[11px] focus:outline-none"
+                              />
+                              <span className="text-slate-400 font-mono">
+                                ({normalizedWeights[rankIdx]}%)
+                              </span>
+                            </div>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={axisItem.weight}
+                            onChange={(e) =>
+                              handleUpdateRankedAxis(rankIdx, {
+                                weight: Number(e.target.value)
+                              })
+                            }
+                            className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${accents[rankIdx]}`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 block">기준명</label>
+                          <input
+                            type="text"
+                            value={axisItem.name}
+                            onChange={(e) =>
+                              handleUpdateRankedAxis(rankIdx, { name: e.target.value })
+                            }
+                            className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-700 text-white font-bold text-xs focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1 text-[10px]">
+                          <input
+                            type="text"
+                            value={axisItem.negativeLabel}
+                            onChange={(e) =>
+                              handleUpdateRankedAxis(rankIdx, { negativeLabel: e.target.value })
+                            }
+                            placeholder="음(-1.0) 설명"
+                            className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300"
+                          />
+                          <input
+                            type="text"
+                            value={axisItem.positiveLabel}
+                            onChange={(e) =>
+                              handleUpdateRankedAxis(rankIdx, { positiveLabel: e.target.value })
+                            }
+                            placeholder="양(+1.0) 설명"
+                            className="w-full px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
+                          {[
+                            { dir: 1 as const, label: '양(+) 선호' },
+                            { dir: 0 as const, label: '중립 선호' },
+                            { dir: -1 as const, label: '음(-) 선호' }
+                          ].map((opt) => (
+                            <button
+                              key={opt.dir}
+                              type="button"
+                              onClick={() =>
+                                handleUpdateRankedAxis(rankIdx, { preferredDirection: opt.dir })
+                              }
+                              className={`py-1 rounded font-semibold ${
+                                axisItem.preferredDirection === opt.dir
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Personal Sentiment & Interest Keywords */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-amber-400" />
+                    선호 기사 성향 (검색 최상단 노출 기준)
+                  </span>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(['ALL', '긍정/지지', '중립/건설적', '우려/비판'] as const).map((sent) => (
+                      <button
+                        key={sent}
+                        type="button"
+                        onClick={() => setPreferredSentiment(sent)}
+                        className={`py-1.5 px-1.5 rounded text-[11px] font-semibold transition-all whitespace-nowrap ${
+                          preferredSentiment === sent
+                            ? 'bg-amber-500 text-slate-950 font-bold'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {sent === 'ALL' ? '전체' : sent}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-200 block">
+                    내 관심 키워드 (쉼표 구분)
+                  </label>
+                  <input
+                    type="text"
+                    value={interestKeywordsInput}
+                    onChange={(e) => setInterestKeywordsInput(e.target.value)}
+                    placeholder="예: AI주권, 수익성, 반도체, 투자"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Article Count & 4D Color Axis */}
+              <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Hash className="w-3.5 h-3.5 text-sky-400" />
+                    실시간 수집 기사 수량: {searchCount}개
+                  </span>
+                  <div className="flex gap-1">
+                    {[10, 20, 30, 50, 100].map((cnt) => (
+                      <button
+                        key={cnt}
+                        type="button"
+                        onClick={() => setSearchCount(cnt)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          searchCount === cnt
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {cnt}개
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={enableColorAxis}
+                      onChange={(e) => setEnableColorAxis(e.target.checked)}
+                      className="rounded border-slate-700 text-blue-600"
+                    />
+                    <span className="flex items-center gap-1.5 text-blue-400">
+                      <Palette className="w-3.5 h-3.5" />
+                      4차원 (Color) 연속 색상 축 사용
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Modal Bottom Actions */}
+              <div className="flex gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleApplyAxesToCurrentView();
+                    setIsCustomSettingsOpen(false);
+                  }}
+                  className="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                  <span>현재 3D 화면에 즉시 적용</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleApplyAxesToCurrentView();
+                    handlePerformSearch();
+                  }}
+                  className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>이 기준으로 실시간 재탐색</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2166,21 +2471,7 @@ export const App: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : (
-          /* Minimized Left Panel Unfold Toggle Button */
-          <div className="pointer-events-auto absolute top-28 left-3.5 z-20">
-            <button
-              type="button"
-              onClick={() => setIsLeftPanelOpen(true)}
-              className="clean-panel px-3 py-2 rounded-xl border border-blue-500/40 shadow-2xl flex items-center gap-1.5 text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800 transition-all"
-              title="좌측 1·2·3순위 축, 가중치 및 공간 제어 패널 펼치기"
-            >
-              <ChevronRight className="w-4 h-4 text-blue-400" />
-              <Box className="w-3.5 h-3.5 text-blue-400" />
-              <span>1·2·3순위 축 & 가중치 제어</span>
-            </button>
-          </div>
-        )}
+        ) : null}
 
         {/* Hover Tooltip (Mouse Cursor Following on Desktop only) */}
         {!isMobile && hoveredArticle && (
@@ -2435,77 +2726,40 @@ export const App: React.FC = () => {
                 </div>
               )}
 
-              {/* In-App Smart Reader & External News Media Portal Hub (Naver / Google / Daum / Publisher) */}
-              {(() => {
-                const portalLinks = buildPortalLinksForArticle(activeSelectedArticle);
-                return (
-                  <div className="space-y-2 pt-1 border-t border-slate-800/80">
-                    <div className="flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setIsReaderModalOpen(true)}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold text-center transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
-                      >
-                        <BookOpen className="w-4 h-4" />
-                        <span>인앱 뉴스 리더 & 연관뉴스 띄우기</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleShareArticle(activeSelectedArticle)}
-                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0"
-                        title="기사 요약 및 좌표 복사"
-                      >
-                        <Share2 className="w-3.5 h-3.5 text-blue-400" />
-                      </button>
-                    </div>
+              {/* In-App Smart Reader & Direct Original Article Link */}
+              <div className="space-y-2 pt-1 border-t border-slate-800/80">
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsReaderModalOpen(true)}
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold text-center transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/30"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span>인앱 뉴스 리더 & 연관뉴스 띄우기</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleShareArticle(activeSelectedArticle)}
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0"
+                    title="기사 요약 및 좌표 복사"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-blue-400" />
+                  </button>
+                </div>
 
-                    <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
-                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                        <Newspaper className="w-3 h-3 text-emerald-400" />
-                        외부 뉴스 매개체로 바로 이동:
-                      </span>
-                      <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                        <a
-                          href={portalLinks.naver}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span>N 네이버 뉴스</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={portalLinks.google}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-300 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span>G 구글 뉴스</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={portalLinks.daum}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-indigo-300 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span>D 다음 뉴스</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        <a
-                          href={portalLinks.original}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center justify-between transition-colors"
-                        >
-                          <span className="truncate">{activeSelectedArticle.publisher} 원문</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                      </div>
-                    </div>
+                <a
+                  href={activeSelectedArticle.origin_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-100 font-bold text-xs flex items-center justify-between transition-colors shadow-sm"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span className="truncate">{activeSelectedArticle.publisher} 원문 기사 바로보기</span>
                   </div>
-                );
-              })()}
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+              </div>
 
               {/* Inline Personal Article Evaluation & 1st/2nd/3rd Axis Calibration Card */}
               <div className="bg-slate-900/95 p-3 rounded-xl border border-cyan-500/30 space-y-2.5 text-xs">
@@ -2639,20 +2893,7 @@ export const App: React.FC = () => {
                 </button>
               </div>
             </aside>
-          ) : (
-            /* Minimized Right Panel Unfold Toggle Button */
-            <div className="pointer-events-auto absolute top-28 right-3.5 z-20">
-              <button
-                type="button"
-                onClick={() => setIsRightPanelOpen(true)}
-                className="clean-panel px-3 py-2 rounded-xl border border-amber-500/40 shadow-2xl flex items-center gap-1.5 text-xs font-bold text-amber-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 transition-all"
-                title="우측 기사 상세 분석 패널 펼치기"
-              >
-                <ChevronLeft className="w-4 h-4 text-amber-400" />
-                <span>기사 상세 분석 ({activeSelectedScore?.personalScore ?? 90}%)</span>
-              </button>
-            </div>
-          ))}
+          ) : null)}
 
         {/* Floating Quick Navigation & Zoom Controls */}
         <div className="pointer-events-auto fixed bottom-3 sm:bottom-4 left-3 sm:left-4 z-20 flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl backdrop-blur-md">
@@ -2772,6 +3013,57 @@ export const App: React.FC = () => {
           onClose={() => setIsRbacGuardOpen(false)}
           featureName={rbacGuardFeature}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+        />
+        <LogoSideDrawer
+          isOpen={isLogoDrawerOpen}
+          onClose={() => setIsLogoDrawerOpen(false)}
+          appMode={appMode}
+          onNavigateHome={() => setAppMode('LANDING')}
+          onNavigateExplorer={() => {
+            handleApplyAxesToCurrentView();
+            setAppMode('EXPLORER');
+          }}
+          currentUser={currentUser}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onLogout={handleLogout}
+          onOpenAdmin={() => {
+            if (requireAuth('관리자 대시보드', 'ADMIN')) {
+              setIsAdminModalOpen(true);
+            }
+          }}
+          onOpenSnapshots={() => {
+            if (requireAuth('3D 스냅샷 및 검색 히스토리')) {
+              setIsSnapshotsDrawerOpen(true);
+            }
+          }}
+          onOpenCustomSettings={() => setIsCustomSettingsOpen(true)}
+          onOpenColorGuide={() => setIsColorGuideOpen(true)}
+          rankedAxes={rankedAxes}
+          normalizedWeights={normalizedWeights}
+          onUpdateRankedAxis={handleUpdateRankedAxis}
+          onApplyWeightPreset={handleApplyWeightPreset}
+          onSwapRankedAxes={handleSwapRankedAxes}
+          searchCount={searchCount}
+          setSearchCount={setSearchCount}
+          onSelectHistoryQuery={(q) => {
+            setSearchFilter(q);
+            handlePerformSearch(undefined, q);
+            setIsLogoDrawerOpen(false);
+          }}
+          onLoadSnapshot={(snapshot) => {
+            setDataset(snapshot.dataset);
+            setCurrentQuery(snapshot.query);
+            setCustomAxes(snapshot.axes);
+            setEnableColorAxis(
+              Boolean(snapshot.axes.color_axis && snapshot.axes.color_axis.trim())
+            );
+            setIsLogoDrawerOpen(false);
+            setIsRightPanelOpen(true);
+            setAppMode('EXPLORER');
+          }}
+          onExportCSV={handleExportCSV}
+          onExportJSON={handleExportJSON}
+          onCapturePNG={handleCapturePNG}
         />
         <ArticleReaderModal
           isOpen={isReaderModalOpen}
