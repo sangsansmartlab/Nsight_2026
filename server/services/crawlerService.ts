@@ -9,11 +9,11 @@ export interface CrawledArticle extends ArticleInput {
 /**
  * High-reliability multi-source news crawler.
  * Integrates Google News RSS + Daum News DOM parser with deduplication
- * and smart relevance scoring to ensure authentic news discovery without hallucinations.
+ * and strict relevance scoring to ensure zero hallucinations.
  */
 export class NewsCrawlerService {
   private userAgent =
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
   /**
    * Cleans text and strips HTML tags
@@ -27,71 +27,69 @@ export class NewsCrawlerService {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&#39;/g, "'")
-      .replace(/&apos;/g, "'")
-      .replace(/&nbsp;/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
   /**
-   * Calculates keyword relevance score with flexible token matching
-   * so genuine news articles are properly ranked without being rejected.
+   * Calculates keyword relevance score to strictly weed out unrelated noise and hallucinations
    */
   public calculateRelevance(title: string, snippet: string, query: string): number {
-    const titleLower = (title || '').toLowerCase();
-    const snippetLower = (snippet || '').toLowerCase();
-    const queryLower = (query || '').toLowerCase().trim();
+    const titleLower = title.toLowerCase();
+    const snippetLower = snippet.toLowerCase();
+    const queryLower = query.toLowerCase().trim();
 
     if (!queryLower) return 1.0;
     if (!titleLower) return -1.0;
 
-    // Remove common punctuation and stopwords
-    const cleanTokens = queryLower
-      .replace(/[\(\)\[\]\{\}\'\"\‘\’\“\”\-\_\+\=\?\!\,\.\:\;]/g, ' ')
-      .split(/\s+/)
-      .filter((t) => t.length > 0);
-
-    if (cleanTokens.length === 0) return 1.0;
+    const tokens = queryLower.split(/\s+/).filter((t) => t.length > 0);
+    if (tokens.length === 0) return 0;
 
     const exactInTitle = titleLower.includes(queryLower);
     const exactInSnippet = snippetLower.includes(queryLower);
 
-    // Initial base relevance for results returned from search engine query
-    let score = 5.0;
-    if (exactInTitle) score += 15.0;
-    if (exactInSnippet) score += 8.0;
-
-    // Calculate token matches
-    let matchedInTitle = 0;
-    let matchedInSnippet = 0;
-
-    for (const token of cleanTokens) {
-      if (token.length <= 1) continue;
-      if (titleLower.includes(token)) matchedInTitle++;
-      if (snippetLower.includes(token)) matchedInSnippet++;
+    // Single token query: MUST appear in title or snippet
+    if (tokens.length === 1) {
+      const token = tokens[0];
+      if (exactInTitle) {
+        return 10.0; // High relevance: headline match
+      }
+      if (exactInSnippet) {
+        return 3.0; // Snippet match
+      }
+      return -1.0; // Does not appear anywhere -> strictly reject
     }
 
-    score += matchedInTitle * 6.0;
-    score += matchedInSnippet * 3.0;
+    // Multi-token query: verify occurrence of query terms
+    const tokensInTitle = tokens.filter((t) => titleLower.includes(t));
+    const tokensInSnippet = tokens.filter((t) => snippetLower.includes(t));
+    const allFoundTokens = new Set([...tokensInTitle, ...tokensInSnippet]);
 
-    // Check Korean particle stripped tokens (e.g. '기본법은' -> '기본법')
-    const strippedTokens = cleanTokens
-      .map((t) =>
-        t.replace(/(은|는|이|가|을|를|의|에|에서|로|으로|과|와|도|만|까지|부터|하다|하는|된|되는)$/, '')
-      )
-      .filter((t) => t.length >= 2);
-
-    for (const st of strippedTokens) {
-      if (titleLower.includes(st) && !cleanTokens.includes(st)) {
-        score += 4.0;
+    // If query has 2 tokens, BOTH must appear across title and snippet
+    if (tokens.length === 2) {
+      if (allFoundTokens.size < 2) {
+        return -1.0;
+      }
+    } else {
+      // If query has 3+ tokens, at least 65% of tokens must be present
+      const matchRatio = allFoundTokens.size / tokens.length;
+      if (matchRatio < 0.65) {
+        return -1.0;
       }
     }
+
+    let score = 2.0;
+    if (exactInTitle) score += 8.0;
+    else if (exactInSnippet) score += 4.0;
+
+    score += tokensInTitle.length * 3.0;
+    score += tokensInSnippet.length * 1.5;
 
     return score;
   }
 
   /**
-   * Search news using Google News RSS (Extremely rich coverage for Korean keywords)
+   * Search news using Google News RSS (Extremely rich coverage for niche keywords)
    */
   public async searchWithGoogleNewsRss(query: string, count: number): Promise<CrawledArticle[]> {
     const encoded = encodeURIComponent(query);
@@ -103,14 +101,14 @@ export class NewsCrawlerService {
           'User-Agent': this.userAgent,
           'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
         },
-        timeout: 8000
+        timeout: 6000
       });
 
       const $ = cheerio.load(response.data, { xmlMode: true });
       const results: CrawledArticle[] = [];
 
       $('item').each((idx, el) => {
-        if (results.length >= count * 2) return false;
+        if (results.length >= count) return false;
 
         const $el = $(el);
         const rawTitle = this.cleanText($el.find('title').text());
@@ -152,13 +150,14 @@ export class NewsCrawlerService {
   }
 
   /**
-   * Search news using Daum News DOM scraper with multiple CSS fallback selectors (Parallel page fetching)
+   * Search news using Daum News DOM scraper
    */
   public async searchWithDomParser(query: string, count: number): Promise<CrawledArticle[]> {
     const encoded = encodeURIComponent(query);
-    const maxPages = Math.min(4, Math.max(1, Math.ceil(count / 10)));
+    const results: CrawledArticle[] = [];
+    const maxPages = Math.min(5, Math.max(1, Math.ceil(count / 12)));
 
-    const fetchPage = async (page: number): Promise<CrawledArticle[]> => {
+    for (let page = 1; page <= maxPages && results.length < count; page++) {
       try {
         const url = `https://search.daum.net/search?w=news&q=${encoded}&sort=accuracy&p=${page}`;
         const response = await axios.get(url, {
@@ -166,42 +165,42 @@ export class NewsCrawlerService {
             'User-Agent': this.userAgent,
             'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
           },
-          timeout: 4500
+          timeout: 5000
         });
 
         const $ = cheerio.load(response.data);
-        const items = $('div.c-item-doc, ul.c-list-basic > li, .c-item-doc, div.item-title');
-        const pageArticles: CrawledArticle[] = [];
+        const items = $('div.c-item-doc, ul.c-list-basic > li');
+        if (items.length === 0) break;
 
         items.each((idx, el) => {
+          if (results.length >= count) return false;
+
           const $el = $(el);
-          const titleLink = $el
-            .find('.item-title a, strong.tit-g a, a.tit_main, a.tit_g, a.link_txt, a[href*="v.daum.net"]')
-            .first();
+          const titleLink = $el.find('.item-title a, strong.tit-g a, a.tit_main').first();
           if (!titleLink.length) return;
 
           const title = this.cleanText(titleLink.text());
           const link = titleLink.attr('href') || '';
 
           const pressText = this.cleanText(
-            $el.find('.item-sub .sub-info, .info_cp, .item-title ~ .item-sub, .txt_info').first().text()
+            $el.find('.item-sub .sub-info, .info_cp, .item-title ~ .item-sub').first().text()
           );
           const publisher = pressText ? pressText.split(/\s+/)[0] : '언론사';
 
           const descText = this.cleanText(
-            $el.find('.item-contents .item-body, .desc, p.conts-desc, .txt_desc').first().text()
+            $el.find('.item-contents .item-body, .desc, p.conts-desc').first().text()
           );
           const snippet = descText || title;
 
-          const dateText = this.cleanText($el.find('.sub-time, .txt_time, .txt_info').first().text());
+          const dateText = this.cleanText($el.find('.sub-time, .txt_time').first().text());
           const pubDate = dateText || '최근';
 
           const relevance = this.calculateRelevance(title, snippet, query);
           if (relevance <= 0.0) return;
 
           if (title && link) {
-            pageArticles.push({
-              id: `daum_${Date.now()}_p${page}_${idx + 1}`,
+            results.push({
+              id: `daum_${Date.now()}_${idx + 1}`,
               title,
               publisher: publisher || '언론사',
               origin_link: link,
@@ -211,86 +210,38 @@ export class NewsCrawlerService {
             });
           }
         });
-
-        return pageArticles;
-      } catch {
-        return [];
+      } catch (pageErr) {
+        break;
       }
-    };
-
-    // Parallel page requests
-    const pagePromises = Array.from({ length: maxPages }, (_, i) => fetchPage(i + 1));
-    const allPageResults = await Promise.all(pagePromises);
-    const results = allPageResults.flat();
+    }
 
     return results;
   }
 
   /**
-   * Builds a mode-specific search query so each mode's 3D graph collects only articles belonging to that mode.
+   * Primary entry point: Queries Google News RSS and Daum News,
+   * performs deduplication and strict relevance ranking.
    */
-  public buildModeQuery(rawQuery: string, mode?: string): string {
-    const base = rawQuery.trim();
-    if (!base) return '';
-    switch (mode) {
-      case 'shopping':
-        return `${base} 비교 가격 성능 후기 가성비`;
-      case 'paper':
-        return `${base} 연구 논문 학술 실험 결과`;
-      case 'patent':
-        return `${base} 특허 출원 기술 개발`;
-      case 'stats':
-        return `${base} 통계 조사 수치 데이터 비율`;
-      case 'knowledge':
-        return `${base} 원리 개념 해설 가이드`;
-      case 'deep':
-        return `${base} 심층 분석 쟁점 전망`;
-      case 'news':
-      default:
-        return base;
-    }
-  }
-
-  /**
-   * Primary entry point: Queries Google News RSS and Daum News in parallel,
-   * performs deduplication and smart relevance ranking for the selected mode.
-   */
-  public async searchNews(
-    query: string,
-    count: number = 30,
-    mode?: string
-  ): Promise<CrawledArticle[]> {
-    const trimmed = (query || '').trim();
-    if (!trimmed) return [];
-
-    const effectiveQuery = this.buildModeQuery(trimmed, mode);
-
-    // 1. Fetch from Google News RSS and Daum News in parallel using mode-specific query
+  public async searchNews(query: string, count: number = 30): Promise<CrawledArticle[]> {
+    // 1. Fetch from Google News RSS and Daum News in parallel
     const [googleResults, daumResults] = await Promise.all([
-      this.searchWithGoogleNewsRss(effectiveQuery, count),
-      this.searchWithDomParser(effectiveQuery, count)
+      this.searchWithGoogleNewsRss(query, count),
+      this.searchWithDomParser(query, count)
     ]);
-
-    // Fallback to base query if mode-specific query yielded too few articles
-    let extraResults: CrawledArticle[] = [];
-    if (googleResults.length + daumResults.length < Math.min(5, count) && effectiveQuery !== trimmed) {
-      extraResults = await this.searchWithGoogleNewsRss(trimmed, count);
-    }
 
     // 2. Combine and deduplicate
     const combined: CrawledArticle[] = [];
     const seenTitles = new Set<string>();
 
-    const normalizeTitle = (t: string) =>
-      t.replace(/[\s\[\]\'\"()…·\-_]/g, '').toLowerCase();
+    const normalizeTitle = (t: string) => t.replace(/[\s\[\]\'\"()…·\-_]/g, '').toLowerCase();
 
-    // Interleave results to provide balanced press perspective
-    const maxLen = Math.max(googleResults.length, daumResults.length, extraResults.length);
+    // Interleave to give diverse perspective
+    const maxLen = Math.max(googleResults.length, daumResults.length);
     for (let i = 0; i < maxLen; i++) {
       if (i < googleResults.length) {
         const item = googleResults[i];
         const norm = normalizeTitle(item.title);
-        if (norm && !seenTitles.has(norm)) {
+        if (!seenTitles.has(norm)) {
           seenTitles.add(norm);
           combined.push(item);
         }
@@ -298,25 +249,18 @@ export class NewsCrawlerService {
       if (i < daumResults.length) {
         const item = daumResults[i];
         const norm = normalizeTitle(item.title);
-        if (norm && !seenTitles.has(norm)) {
+        if (!seenTitles.has(norm)) {
           seenTitles.add(norm);
           combined.push(item);
         }
       }
-      if (i < extraResults.length) {
-        const item = extraResults[i];
-        const norm = normalizeTitle(item.title);
-        if (norm && !seenTitles.has(norm)) {
-          seenTitles.add(norm);
-          combined.push(item);
-        }
-      }
+      if (combined.length >= count * 2) break;
     }
 
-    // Sort by calculated relevance score descending
+    // Sort by strict relevance score descending
     combined.sort((a, b) => {
-      const scoreA = this.calculateRelevance(a.title, a.snippet || '', trimmed);
-      const scoreB = this.calculateRelevance(b.title, b.snippet || '', trimmed);
+      const scoreA = this.calculateRelevance(a.title, a.snippet || '', query);
+      const scoreB = this.calculateRelevance(b.title, b.snippet || '', query);
       return scoreB - scoreA;
     });
 
@@ -566,3 +510,5 @@ export class NewsCrawlerService {
 }
 
 export const newsCrawlerService = new NewsCrawlerService();
+
+

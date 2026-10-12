@@ -8,31 +8,6 @@ export interface CoordinateScore {
   color_label: string;
 }
 
-export type SearchModeId =
-  | 'news'
-  | 'shopping'
-  | 'paper'
-  | 'patent'
-  | 'stats'
-  | 'knowledge'
-  | 'deep';
-
-export interface SearchVisualizationModeSpec {
-  id: SearchModeId;
-  mode: string; // e.g., "뉴스 모드"
-  purpose: string; // e.g., "사안·이슈·최신 소식 보기"
-  axes: {
-    x: string;
-    y: string;
-    z: string;
-    color: string;
-  };
-  rankedAxes: [RankedAxisItem, RankedAxisItem, RankedAxisItem];
-  colorAxisDescription: string;
-  accentColor: string;
-  queryContextKeywords: string[];
-}
-
 export interface Article {
   id: string;
   title: string;
@@ -44,7 +19,6 @@ export interface Article {
   coordinates: CoordinateScore;
   ai_rationale: string;
   body_snippet?: string;
-  modeCategory?: SearchModeId;
 }
 
 export interface CustomAxes {

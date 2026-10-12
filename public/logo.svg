@@ -1,0 +1,65 @@
+<svg width="128" height="128" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="cubeGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <linearGradient id="topFaceGrad" x1="40" y1="36" x2="120" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#6366F1" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#C084FC" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="leftFaceGrad" x1="40" y1="76" x2="80" y2="140" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0284C7" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#2563EB" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#0EA5E9" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="rightFaceGrad" x1="80" y1="76" x2="120" y2="140" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.9" />
+      <stop offset="60%" stop-color="#9333EA" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#C084FC" stop-opacity="0.95" />
+    </linearGradient>
+    <radialGradient id="nodeCyan" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#E0F2FE" />
+      <stop offset="40%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </radialGradient>
+    <radialGradient id="nodeBlue" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#E0E7FF" />
+      <stop offset="40%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </radialGradient>
+    <radialGradient id="nodePurple" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#F5D0FE" />
+      <stop offset="40%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#7E22CE" />
+    </radialGradient>
+  </defs>
+
+  <rect width="160" height="160" rx="36" fill="#070A13"/>
+
+  <!-- Glowing Axis Lines -->
+  <line x1="80" y1="80" x2="80" y2="24" stroke="#60A5FA" stroke-width="3" stroke-linecap="round" />
+  <line x1="80" y1="80" x2="26" y2="114" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" />
+  <line x1="80" y1="80" x2="134" y2="114" stroke="#C084FC" stroke-width="3" stroke-linecap="round" />
+
+  <!-- Isometric Faces -->
+  <polygon points="40,54 80,78 80,126 40,102" fill="url(#leftFaceGrad)" stroke="#E0F2FE" stroke-width="1.5" stroke-opacity="0.7" />
+  <polygon points="80,78 120,54 120,102 80,126" fill="url(#rightFaceGrad)" stroke="#F3E8FF" stroke-width="1.5" stroke-opacity="0.7" />
+  <polygon points="80,30 120,54 80,78 40,54" fill="url(#topFaceGrad)" stroke="#FFFFFF" stroke-width="1.8" stroke-opacity="0.9" />
+
+  <!-- Inner wireframe bevels -->
+  <polyline points="40,54 80,78 120,54" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-opacity="0.8" />
+  <line x1="80" y1="78" x2="80" y2="126" stroke="#FFFFFF" stroke-width="1.6" stroke-opacity="0.8" />
+
+  <!-- Floating internal voxels -->
+  <rect x="74" y="66" width="7" height="7" fill="#BAE6FD" rx="1.5" />
+  <rect x="62" y="86" width="6" height="6" fill="#38BDF8" rx="1.5" />
+  <rect x="92" y="82" width="7" height="7" fill="#DDD6FE" rx="1.5" />
+  <rect x="86" y="98" width="6" height="6" fill="#C084FC" rx="1.5" />
+
+  <!-- Spherical Coordinate Nodes -->
+  <circle cx="80" cy="24" r="7.5" fill="url(#nodeBlue)" />
+  <circle cx="26" cy="114" r="7.5" fill="url(#nodeCyan)" />
+  <circle cx="134" cy="114" r="7.5" fill="url(#nodePurple)" />
+</svg>

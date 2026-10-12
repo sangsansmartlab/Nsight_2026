@@ -86,123 +86,69 @@ apiRouter.post('/analyze', async (req: Request, res: Response) => {
   }
 });
 
-// High-speed in-memory query cache with 15-minute TTL
-interface SearchCacheEntry {
-  data: {
-    status: string;
-    total: number;
-    axes: CustomAxesInput;
-    articles: any[];
-    message?: string;
-  };
-  expiresAt: number;
-}
-
-const searchCache = new Map<string, SearchCacheEntry>();
-const MAX_CACHE_ENTRIES = 100;
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
-
-const getCacheKey = (
-  query: string,
-  count: number,
-  axes: CustomAxesInput,
-  rankedAxes?: RankedAxisInput[],
-  mode?: string
-): string => {
-  return `${mode || 'news'}::${query.trim().toLowerCase()}::${count}::${axes.x_axis}::${axes.y_axis}::${axes.z_axis}::${axes.color_axis}::${JSON.stringify(rankedAxes || [])}`;
-};
-
 /**
- * Real-time Search and Vectorization Endpoint (Mode-Dedicated 3D Graph)
+ * Real-time Search and Vectorization Endpoint
  */
 apiRouter.post('/search', async (req: Request, res: Response) => {
   try {
-    const { query, display_count, custom_axes, ranked_axes, mode } = req.body;
+    const { query, display_count, custom_axes, ranked_axes } = req.body;
 
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'query string is required' });
     }
 
-    const activeMode: string = typeof mode === 'string' && mode ? mode : 'news';
     const count = Math.min(100, Math.max(1, Number(display_count) || 30));
     const axes: CustomAxesInput = custom_axes || {
-      x_axis: '반대 ↔ 찬성',
-      y_axis: '파급력',
-      z_axis: '신뢰도',
-      color_axis: '논조'
+      x_axis: '규제 중심 vs 산업 진흥',
+      y_axis: '사회적 파급력 & 영향도',
+      z_axis: '정보 신뢰도 & 객관성',
+      color_axis: '기사 성향 (긍정 / 중립 / 비판)'
     };
     const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
-      ? rankedAxesFromReq(ranked_axes)
+      ? ranked_axes
       : undefined;
 
-    // Check In-Memory Cache for ultra-fast <10ms response
-    const cacheKey = getCacheKey(query, count, axes, rankedAxes, activeMode);
-    const cached = searchCache.get(cacheKey);
-    const now = Date.now();
-    if (cached && cached.expiresAt > now) {
-      return res.json(cached.data);
-    }
-
-    // 1. Live Web Discovery & Crawling via Google News RSS & Parallel Daum News Engine (Tailored per Mode)
+    // 1. Live Web Discovery & Crawling via Google News RSS & Daum News DOM Engine
     let candidateArticles: ArticleInput[] = [];
     try {
-      candidateArticles = await newsCrawlerService.searchNews(query, count, activeMode);
+      candidateArticles = await newsCrawlerService.searchNews(query, count);
     } catch (crawlErr) {
       console.warn('[Search API] Crawler error, using fallback format:', crawlErr);
     }
 
     // Strict Anti-Hallucination Policy: NEVER fabricate fake mock news articles
     if (!candidateArticles || candidateArticles.length === 0) {
-      const emptyResponse = {
+      return res.json({
         status: 'empty',
         total: 0,
         axes,
         articles: [],
-        message: `'${query}'에 대한 해당 모드 기사를 찾지 못했습니다. 보다 널리 쓰이는 키워드로 검색해 보세요.`
-      };
-      return res.json(emptyResponse);
+        message: `'${query}'에 대한 실제 뉴스 보도를 찾지 못했습니다. 보다 널리 쓰이는 키워드로 검색해 보세요.`
+      });
     }
 
     const articlesToAnalyze = candidateArticles.slice(0, count);
 
-    // 2. Groq parallel multi-article chunk vectorization for this mode's dedicated 3D graph
+    // 2. Groq strictly does 4D Vector Coordinates, 3-line summaries and Rationale inference
     const analyzed = await groqAnalysisService.analyzeBatch(
       articlesToAnalyze,
       axes,
       5,
       undefined,
-      rankedAxes,
-      activeMode
+      rankedAxes
     );
 
-    const resultPayload = {
+    res.json({
       status: 'success',
-      mode: activeMode,
       total: analyzed.length,
       axes,
       articles: analyzed
-    };
-
-    // Save to Cache
-    if (searchCache.size >= MAX_CACHE_ENTRIES) {
-      const oldestKey = searchCache.keys().next().value;
-      if (oldestKey) searchCache.delete(oldestKey);
-    }
-    searchCache.set(cacheKey, {
-      data: resultPayload,
-      expiresAt: now + CACHE_TTL_MS
     });
-
-    res.json(resultPayload);
   } catch (error: any) {
     console.error('[API /search Error]:', error);
     res.status(500).json({ error: error.message || 'Search execution failed' });
   }
 });
-
-function rankedAxesFromReq(raw: any[]): RankedAxisInput[] {
-  return raw;
-}
 
 /**
  * In-App Smart Reader Preview & Related Portal News Endpoint
@@ -247,7 +193,7 @@ apiRouter.post('/article-preview', async (req: Request, res: Response) => {
 /**
  * Single Found Article 4D Vectorization & Addition Endpoint
  * Analyzes a single article (from related news, external URL, or title/snippet)
- * against the user's active mode and 1st/2nd/3rd priority axes so it can be added to the 3D space.
+ * against the user's active 1st/2nd/3rd priority axes so it can be added to the 3D space.
  */
 apiRouter.post('/add-article', async (req: Request, res: Response) => {
   try {
@@ -258,20 +204,18 @@ apiRouter.post('/add-article', async (req: Request, res: Response) => {
       pub_date,
       snippet,
       custom_axes,
-      ranked_axes,
-      mode
+      ranked_axes
     } = req.body;
 
     if (!url && !title) {
       return res.status(400).json({ error: 'Either url or title is required' });
     }
 
-    const activeMode: string = typeof mode === 'string' && mode ? mode : 'news';
     const axes: CustomAxesInput = custom_axes || {
-      x_axis: '반대 ↔ 찬성',
-      y_axis: '파급력',
-      z_axis: '신뢰도',
-      color_axis: '논조'
+      x_axis: '규제 중심 vs 산업 진흥',
+      y_axis: '사회적 파급력 & 영향도',
+      z_axis: '정보 신뢰도 & 객관성',
+      color_axis: '기사 성향 (긍정 / 중립 / 비판)'
     };
 
     const rankedAxes: RankedAxisInput[] | undefined = Array.isArray(ranked_axes)
@@ -291,8 +235,7 @@ apiRouter.post('/add-article', async (req: Request, res: Response) => {
       axes,
       1,
       undefined,
-      rankedAxes,
-      activeMode
+      rankedAxes
     );
 
     if (!analyzedList || analyzedList.length === 0) {
